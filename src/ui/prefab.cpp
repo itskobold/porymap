@@ -337,17 +337,16 @@ bool Prefab::tryImportDefaultPrefabs(QWidget * parent, BaseGameVersion version, 
             return false;
         }
 
-        ParseUtil parser;
         QString content;
         switch (version) {
         case BaseGameVersion::pokeruby:
-            content = parser.readTextFile(":/text/prefabs_default_ruby.json");
+            content = ParseUtil::readTextFile(":/text/prefabs_default_ruby.json");
             break;
         case BaseGameVersion::pokefirered:
-            content = parser.readTextFile(":/text/prefabs_default_firered.json");
+            content = ParseUtil::readTextFile(":/text/prefabs_default_firered.json");
             break;
         case BaseGameVersion::pokeemerald:
-            content = parser.readTextFile(":/text/prefabs_default_emerald.json");
+            content = ParseUtil::readTextFile(":/text/prefabs_default_emerald.json");
             break;
         default:
             content = QString();

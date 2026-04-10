@@ -123,21 +123,17 @@ bool RegionMapEditor::saveRegionMapEntries() {
 }
 
 void buildEmeraldDefaults(poryjson::Json &json) {
-    ParseUtil parser;
-    QString emeraldDefault = parser.readTextFile(":/text/region_map_default_emerald.json");
+    QString emeraldDefault = ParseUtil::readTextFile(":/text/region_map_default_emerald.json");
     json = poryjson::Json::parse(emeraldDefault);
 }
 
 void buildRubyDefaults(poryjson::Json &json) {
-    ParseUtil parser;
-    QString emeraldDefault = parser.readTextFile(":/text/region_map_default_ruby.json");
+    QString emeraldDefault = ParseUtil::readTextFile(":/text/region_map_default_ruby.json");
     json = poryjson::Json::parse(emeraldDefault);
 }
 
 void buildFireredDefaults(poryjson::Json &json) {
-
-    ParseUtil parser;
-    QString fireredDefault = parser.readTextFile(":/text/region_map_default_firered.json");    
+    QString fireredDefault = ParseUtil::readTextFile(":/text/region_map_default_firered.json");
     json = poryjson::Json::parse(fireredDefault);
 }
 

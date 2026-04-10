@@ -32,7 +32,9 @@ int Project::num_pals_total = 13;
 
 Project::Project(QObject *parent) :
     QObject(parent)
-{ }
+{
+    this->parser.setIncbinPattern(projectConfig.getIdentifier(ProjectIdentifier::regex_incbin));
+}
 
 Project::~Project()
 {
