@@ -102,10 +102,10 @@ private:
     void setShowTriggers(bool checked);
     void setShowHealLocations(bool checked);
     void setShowAllEvents(bool checked);
-    void setShowConnectionUp(bool checked);
-    void setShowConnectionDown(bool checked);
-    void setShowConnectionLeft(bool checked);
-    void setShowConnectionRight(bool checked);
+    void setShowConnectionNorth(bool checked);
+    void setShowConnectionSouth(bool checked);
+    void setShowConnectionWest(bool checked);
+    void setShowConnectionEast(bool checked);
     void setShowAllConnections(bool checked);
     void setShowCollision(bool checked);
     void setDisablePreviewScaling(bool checked);

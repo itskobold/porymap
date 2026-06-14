@@ -104,6 +104,11 @@ void ConnectionPixmapItem::updateOrigin() {
     } else if (this->connection->isHorizontal()) {
         this->originX = this->connection->relativePixelPos(true).x();
         this->originY = 0;
+    } else if (this->connection->isDiagonal()) {
+        // Diagonal connections are anchored to a corner; both axes are fixed (offset does not apply).
+        const QPoint pos = this->connection->relativePixelPos(true);
+        this->originX = pos.x();
+        this->originY = pos.y();
     }
     updatePos();
 }

@@ -36,6 +36,8 @@ public:
     void setSong(const QString &song);
     void setLocation(const QString &location);
     void setLocationName(const QString &locationName);
+    void setXPosition(int pos);
+    void setYPosition(int pos);
     void setRequiresFlash(bool requiresFlash);
     void setWeather(const QString &weather);
     void setType(const QString &type);
@@ -49,6 +51,8 @@ public:
     QString song() const;
     QString location() const;
     QString locationName() const;
+    int xPos() const;
+    int yPos() const;
     bool requiresFlash() const;
     QString weather() const;
     QString type() const;
@@ -73,6 +77,8 @@ private:
     void onSongUpdated(const QString &song);
     void onLocationChanged(const QString &location);
     void onLocationNameChanged(const QString &locationName);
+    void onXPosChanged(int pos);
+    void onYPosChanged(int pos);
     void onWeatherChanged(const QString &weather);
     void onTypeChanged(const QString &type);
     void onBattleSceneChanged(const QString &battleScene);

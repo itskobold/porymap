@@ -14,6 +14,8 @@ public:
     bool operator==(const MapHeader& other) const {
         return m_song == other.m_song
         && m_location == other.m_location
+        && m_xPos == other.m_xPos
+        && m_yPos == other.m_yPos
         && m_requiresFlash == other.m_requiresFlash
         && m_weather == other.m_weather
         && m_type == other.m_type
@@ -30,6 +32,8 @@ public:
 
     void setSong(const QString &song);
     void setLocation(const QString &location);
+    void setXPosition(int pos);
+    void setYPosition(int pos);
     void setRequiresFlash(bool requiresFlash);
     void setWeather(const QString &weather);
     void setType(const QString &type);
@@ -42,6 +46,8 @@ public:
 
     QString song() const { return m_song; }
     QString location() const { return m_location; }
+    int xPos() const { return m_xPos; }
+    int yPos() const { return m_yPos; }
     bool requiresFlash() const { return m_requiresFlash; }
     QString weather() const { return m_weather; }
     QString type() const { return m_type; }
@@ -55,6 +61,8 @@ public:
 signals:
     void songChanged(QString);
     void locationChanged(QString);
+    void xPosChanged(int);
+    void yPosChanged(int);
     void requiresFlashChanged(bool);
     void weatherChanged(QString);
     void typeChanged(QString);
@@ -69,6 +77,8 @@ signals:
 private:
     QString m_song;
     QString m_location;
+    int m_xPos;
+    int m_yPos;
     bool m_requiresFlash = false;
     QString m_weather;
     QString m_type;

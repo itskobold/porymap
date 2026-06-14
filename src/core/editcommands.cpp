@@ -27,14 +27,14 @@ int getEventTypeMask(const QList<Event *> &events) {
 int getConnectionDirectionMask(const QList<QString> &directions) {
     int mask = 0;
     for (auto direction : directions) {
-        if (direction == "up") {
-            mask |= IDMask_ConnectionDirection_Up;
-        } else if (direction == "down") {
-            mask |= IDMask_ConnectionDirection_Down;
-        } else if (direction == "left") {
-            mask |= IDMask_ConnectionDirection_Left;
-        } else if (direction == "right") {
-            mask |= IDMask_ConnectionDirection_Right;
+        if (direction == "north") {
+            mask |= IDMask_ConnectionDirection_North;
+        } else if (direction == "south") {
+            mask |= IDMask_ConnectionDirection_South;
+        } else if (direction == "west") {
+            mask |= IDMask_ConnectionDirection_West;
+        } else if (direction == "east") {
+            mask |= IDMask_ConnectionDirection_East;
         } else if (direction == "dive") {
             mask |= IDMask_ConnectionDirection_Dive;
         } else if (direction == "emerge") {

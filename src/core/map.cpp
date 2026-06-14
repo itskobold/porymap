@@ -72,15 +72,31 @@ QRect Map::getConnectionRect(const QString &direction, Layout * fromLayout) cons
     int w = pixelWidth(), h = pixelHeight();
 
     QMargins viewDistance = Project::getPixelViewDistance();
-    if (direction == "up") {
+    if (direction == "north") {
         h = qMin(h, viewDistance.top());
         y = pixelHeight() - h;
-    } else if (direction == "down") {
+    } else if (direction == "south") {
         h = qMin(h, viewDistance.bottom());
-    } else if (direction == "left") {
+    } else if (direction == "west") {
         w = qMin(w, viewDistance.left());
         x = pixelWidth() - w;
-    } else if (direction == "right") {
+    } else if (direction == "east") {
+        w = qMin(w, viewDistance.right());
+    } else if (direction == "northwest") {
+        h = qMin(h, viewDistance.top());
+        y = pixelHeight() - h;
+        w = qMin(w, viewDistance.left());
+        x = pixelWidth() - w;
+    } else if (direction == "northeast") {
+        h = qMin(h, viewDistance.top());
+        y = pixelHeight() - h;
+        w = qMin(w, viewDistance.right());
+    } else if (direction == "southwest") {
+        h = qMin(h, viewDistance.bottom());
+        w = qMin(w, viewDistance.left());
+        x = pixelWidth() - w;
+    } else if (direction == "southeast") {
+        h = qMin(h, viewDistance.bottom());
         w = qMin(w, viewDistance.right());
     } else if (MapConnection::isDiving(direction)) {
         if (fromLayout) {

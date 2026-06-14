@@ -27,8 +27,8 @@ signals:
 
 private:
     QPixmap basePixmap;
-    qreal originX;
-    qreal originY;
+    qreal originX = 0;
+    qreal originY = 0;
     bool selected = false;
     unsigned actionId = 0;
 

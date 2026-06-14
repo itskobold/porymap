@@ -114,30 +114,30 @@
          <item row="0" column="0">
           <layout class="QGridLayout" name="gridLayout_Connection_Options">
            <item row="1" column="2">
-            <widget class="QCheckBox" name="checkBox_ConnectionLeft">
+            <widget class="QCheckBox" name="checkBox_ConnectionWest">
              <property name="text">
-              <string>Left</string>
+              <string>West</string>
              </property>
             </widget>
            </item>
            <item row="1" column="0">
-            <widget class="QCheckBox" name="checkBox_ConnectionUp">
+            <widget class="QCheckBox" name="checkBox_ConnectionNorth">
              <property name="text">
-              <string>Up</string>
+              <string>North</string>
              </property>
             </widget>
            </item>
            <item row="1" column="3">
-            <widget class="QCheckBox" name="checkBox_ConnectionRight">
+            <widget class="QCheckBox" name="checkBox_ConnectionEast">
              <property name="text">
-              <string>Right</string>
+              <string>East</string>
              </property>
             </widget>
            </item>
            <item row="1" column="1">
-            <widget class="QCheckBox" name="checkBox_ConnectionDown">
+            <widget class="QCheckBox" name="checkBox_ConnectionSouth">
              <property name="text">
-              <string>Down</string>
+              <string>South</string>
              </property>
             </widget>
            </item>

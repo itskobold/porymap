@@ -30,6 +30,7 @@ public:
     bool isCardinal() const { return isCardinal(m_direction); }
     bool isHorizontal() const { return isHorizontal(m_direction); }
     bool isVertical() const { return isVertical(m_direction); }
+    bool isDiagonal() const { return isDiagonal(m_direction); }
     bool isDiving() const { return isDiving(m_direction); }
 
     int offset() const { return m_offset; }
@@ -51,6 +52,7 @@ public:
     static bool isCardinal(const QString &direction);
     static bool isHorizontal(const QString &direction);
     static bool isVertical(const QString &direction);
+    static bool isDiagonal(const QString &direction);
     static bool isDiving(const QString &direction);
     static QString oppositeDirection(const QString &direction) { return oppositeDirections.value(direction, direction); }
     static bool areMirrored(const MapConnection*, const MapConnection*);

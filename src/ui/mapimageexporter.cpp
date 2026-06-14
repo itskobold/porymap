@@ -63,10 +63,10 @@ MapImageExporter::MapImageExporter(QWidget *parent, Project *project, Map *map, 
     connect(ui->checkBox_Triggers,              &QCheckBox::toggled, this, &MapImageExporter::setShowTriggers);
     connect(ui->checkBox_HealLocations,         &QCheckBox::toggled, this, &MapImageExporter::setShowHealLocations);
     connect(ui->checkBox_AllEvents,             &QCheckBox::toggled, this, &MapImageExporter::setShowAllEvents);
-    connect(ui->checkBox_ConnectionUp,          &QCheckBox::toggled, this, &MapImageExporter::setShowConnectionUp);
-    connect(ui->checkBox_ConnectionDown,        &QCheckBox::toggled, this, &MapImageExporter::setShowConnectionDown);
-    connect(ui->checkBox_ConnectionLeft,        &QCheckBox::toggled, this, &MapImageExporter::setShowConnectionLeft);
-    connect(ui->checkBox_ConnectionRight,       &QCheckBox::toggled, this, &MapImageExporter::setShowConnectionRight);
+    connect(ui->checkBox_ConnectionNorth,       &QCheckBox::toggled, this, &MapImageExporter::setShowConnectionNorth);
+    connect(ui->checkBox_ConnectionSouth,       &QCheckBox::toggled, this, &MapImageExporter::setShowConnectionSouth);
+    connect(ui->checkBox_ConnectionWest,        &QCheckBox::toggled, this, &MapImageExporter::setShowConnectionWest);
+    connect(ui->checkBox_ConnectionEast,        &QCheckBox::toggled, this, &MapImageExporter::setShowConnectionEast);
     connect(ui->checkBox_AllConnections,        &QCheckBox::toggled, this, &MapImageExporter::setShowAllConnections);
     connect(ui->checkBox_Collision,             &QCheckBox::toggled, this, &MapImageExporter::setShowCollision);
     connect(ui->checkBox_Grid,                  &QCheckBox::toggled, this, &MapImageExporter::setShowGrid);
@@ -258,10 +258,10 @@ bool MapImageExporter::currentHistoryAppliesToFrame(QUndoStack *historyStack) {
             if (!connectionsEnabled())
                 return false;
             uint32_t flags = 0;
-            if (m_settings.showConnections.contains("up"))    flags |= IDMask_ConnectionDirection_Up;
-            if (m_settings.showConnections.contains("down"))  flags |= IDMask_ConnectionDirection_Down;
-            if (m_settings.showConnections.contains("left"))  flags |= IDMask_ConnectionDirection_Left;
-            if (m_settings.showConnections.contains("right")) flags |= IDMask_ConnectionDirection_Right;
+            if (m_settings.showConnections.contains("north")) flags |= IDMask_ConnectionDirection_North;
+            if (m_settings.showConnections.contains("south")) flags |= IDMask_ConnectionDirection_South;
+            if (m_settings.showConnections.contains("west"))  flags |= IDMask_ConnectionDirection_West;
+            if (m_settings.showConnections.contains("east"))  flags |= IDMask_ConnectionDirection_East;
             return (command->id() & flags) != 0;
         }
         case CommandId::ID_EventMove:
@@ -618,10 +618,10 @@ QMargins MapImageExporter::getMargins(const Map *map) {
             if (!targetMap) continue;
 
             QRect rect = targetMap->getConnectionRect(dir);
-            if (dir == "up") margins.setTop(qMax(rect.height(), margins.top()));
-            else if (dir == "down") margins.setBottom(qMax(rect.height(), margins.bottom()));
-            else if (dir == "left") margins.setLeft(qMax(rect.width(), margins.left()));
-            else if (dir == "right") margins.setRight(qMax(rect.width(), margins.right()));
+            if (dir == "north") margins.setTop(qMax(rect.height(), margins.top()));
+            else if (dir == "south") margins.setBottom(qMax(rect.height(), margins.bottom()));
+            else if (dir == "west") margins.setLeft(qMax(rect.width(), margins.left()));
+            else if (dir == "east") margins.setRight(qMax(rect.width(), margins.right()));
         }
     }
     if (m_settings.showGrid) {
@@ -805,47 +805,47 @@ void MapImageExporter::setShowAllEvents(bool checked) {
     updatePreview();
 }
 
-void MapImageExporter::setShowConnectionUp(bool checked) {
-    setConnectionDirectionEnabled("up", checked);
+void MapImageExporter::setShowConnectionNorth(bool checked) {
+    setConnectionDirectionEnabled("north", checked);
     updatePreview();
 }
 
-void MapImageExporter::setShowConnectionDown(bool checked) {
-    setConnectionDirectionEnabled("down", checked);
+void MapImageExporter::setShowConnectionSouth(bool checked) {
+    setConnectionDirectionEnabled("south", checked);
     updatePreview();
 }
 
-void MapImageExporter::setShowConnectionLeft(bool checked) {
-    setConnectionDirectionEnabled("left", checked);
+void MapImageExporter::setShowConnectionWest(bool checked) {
+    setConnectionDirectionEnabled("west", checked);
     updatePreview();
 }
 
-void MapImageExporter::setShowConnectionRight(bool checked) {
-    setConnectionDirectionEnabled("right", checked);
+void MapImageExporter::setShowConnectionEast(bool checked) {
+    setConnectionDirectionEnabled("east", checked);
     updatePreview();
 }
 
 // Shortcut setting for enabling all connection directions
 void MapImageExporter::setShowAllConnections(bool checked) {
-    const QSignalBlocker b_Up(ui->checkBox_ConnectionUp);
-    ui->checkBox_ConnectionUp->setChecked(checked);
-    ui->checkBox_ConnectionUp->setDisabled(checked);
-    setConnectionDirectionEnabled("up", checked);
+    const QSignalBlocker b_North(ui->checkBox_ConnectionNorth);
+    ui->checkBox_ConnectionNorth->setChecked(checked);
+    ui->checkBox_ConnectionNorth->setDisabled(checked);
+    setConnectionDirectionEnabled("north", checked);
 
-    const QSignalBlocker b_Down(ui->checkBox_ConnectionDown);
-    ui->checkBox_ConnectionDown->setChecked(checked);
-    ui->checkBox_ConnectionDown->setDisabled(checked);
-    setConnectionDirectionEnabled("down", checked);
+    const QSignalBlocker b_South(ui->checkBox_ConnectionSouth);
+    ui->checkBox_ConnectionSouth->setChecked(checked);
+    ui->checkBox_ConnectionSouth->setDisabled(checked);
+    setConnectionDirectionEnabled("south", checked);
 
-    const QSignalBlocker b_Left(ui->checkBox_ConnectionLeft);
-    ui->checkBox_ConnectionLeft->setChecked(checked);
-    ui->checkBox_ConnectionLeft->setDisabled(checked);
-    setConnectionDirectionEnabled("left", checked);
+    const QSignalBlocker b_West(ui->checkBox_ConnectionWest);
+    ui->checkBox_ConnectionWest->setChecked(checked);
+    ui->checkBox_ConnectionWest->setDisabled(checked);
+    setConnectionDirectionEnabled("west", checked);
 
-    const QSignalBlocker b_Right(ui->checkBox_ConnectionRight);
-    ui->checkBox_ConnectionRight->setChecked(checked);
-    ui->checkBox_ConnectionRight->setDisabled(checked);
-    setConnectionDirectionEnabled("right", checked);
+    const QSignalBlocker b_East(ui->checkBox_ConnectionEast);
+    ui->checkBox_ConnectionEast->setChecked(checked);
+    ui->checkBox_ConnectionEast->setDisabled(checked);
+    setConnectionDirectionEnabled("east", checked);
 
     updatePreview();
 }

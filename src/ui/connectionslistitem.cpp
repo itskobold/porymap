@@ -75,6 +75,9 @@ void ConnectionsListItem::updateUI() {
     ui->comboBox_Direction->setTextItem(this->connection->direction());
     ui->comboBox_Map->setTextItem(this->connection->targetMapName());
     ui->spinBox_Offset->setValue(this->connection->offset());
+
+    // Diagonal connections are anchored to a corner; their offset is unused (both in-game and in the editor).
+    ui->spinBox_Offset->setEnabled(!this->connection->isDiagonal());
 }
 
 bool ConnectionsListItem::eventFilter(QObject*, QEvent *event) {

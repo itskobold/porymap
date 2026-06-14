@@ -47,10 +47,10 @@ enum CommandId {
 #define IDMask_EventType_Trigger (1 << 11)
 #define IDMask_EventType_Heal    (1 << 12)
 
-#define IDMask_ConnectionDirection_Up     (1 << 8)
-#define IDMask_ConnectionDirection_Down   (1 << 9)
-#define IDMask_ConnectionDirection_Left   (1 << 10)
-#define IDMask_ConnectionDirection_Right  (1 << 11)
+#define IDMask_ConnectionDirection_North  (1 << 8)
+#define IDMask_ConnectionDirection_South  (1 << 9)
+#define IDMask_ConnectionDirection_West   (1 << 10)
+#define IDMask_ConnectionDirection_East   (1 << 11)
 #define IDMask_ConnectionDirection_Dive   (1 << 12)
 #define IDMask_ConnectionDirection_Emerge (1 << 13)
 

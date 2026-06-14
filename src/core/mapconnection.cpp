@@ -4,8 +4,10 @@
 QPointer<Project> MapConnection::project = nullptr;
 
 const QMap<QString, QString> MapConnection::oppositeDirections = {
-    {"up", "down"}, {"down", "up"},
-    {"right", "left"}, {"left", "right"},
+    {"north", "south"}, {"south", "north"},
+    {"east", "west"}, {"west", "east"},
+    {"northeast", "southwest"}, {"southwest", "northeast"},
+    {"northwest", "southeast"}, {"southeast", "northwest"},
     {"dive", "emerge"}, {"emerge", "dive"}
 };
 
@@ -78,18 +80,30 @@ QImage MapConnection::renderImage() const {
 // If 'clipped' is true, only the rendered dimensions of the target map will be used, rather than its full dimensions.
 QPoint MapConnection::relativePixelPos(bool clipped) const {
     int x = 0, y = 0;
-    if (m_direction == "right") {
+    if (m_direction == "east") {
         if (m_parentMap) x = m_parentMap->pixelWidth();
         y = m_offset * Metatile::pixelHeight();
-    } else if (m_direction == "down") {
+    } else if (m_direction == "south") {
         x = m_offset * Metatile::pixelWidth();
         if (m_parentMap) y = m_parentMap->pixelHeight();
-    } else if (m_direction == "left") {
+    } else if (m_direction == "west") {
         if (targetMap()) x = !clipped ? -targetMap()->pixelWidth() : -targetMap()->getConnectionRect(m_direction).width();
         y = m_offset * Metatile::pixelHeight();
-    } else if (m_direction == "up") {
+    } else if (m_direction == "north") {
         x = m_offset * Metatile::pixelWidth();
         if (targetMap()) y = !clipped ? -targetMap()->pixelHeight() : -targetMap()->getConnectionRect(m_direction).height();
+    } else if (m_direction == "northwest") {
+        if (targetMap()) x = !clipped ? -targetMap()->pixelWidth() : -targetMap()->getConnectionRect(m_direction).width();
+        if (targetMap()) y = !clipped ? -targetMap()->pixelHeight() : -targetMap()->getConnectionRect(m_direction).height();
+    } else if (m_direction == "northeast") {
+        if (m_parentMap) x = m_parentMap->pixelWidth();
+        if (targetMap()) y = !clipped ? -targetMap()->pixelHeight() : -targetMap()->getConnectionRect(m_direction).height();
+    } else if (m_direction == "southwest") {
+        if (targetMap()) x = !clipped ? -targetMap()->pixelWidth() : -targetMap()->getConnectionRect(m_direction).width();
+        if (m_parentMap) y = m_parentMap->pixelHeight();
+    } else if (m_direction == "southeast") {
+        if (m_parentMap) x = m_parentMap->pixelWidth();
+        if (m_parentMap) y = m_parentMap->pixelHeight();
     }
     return QPoint(x, y);
 }
@@ -169,7 +183,7 @@ void MapConnection::setOffset(int offset, bool mirror) {
 }
 
 const QStringList MapConnection::cardinalDirections = {
-    "up", "down", "left", "right"
+    "north", "south", "west", "east", "northwest", "northeast", "southwest", "southeast"
 };
 
 bool MapConnection::isCardinal(const QString &direction) {
@@ -177,11 +191,16 @@ bool MapConnection::isCardinal(const QString &direction) {
 }
 
 bool MapConnection::isHorizontal(const QString &direction) {
-    return direction == "left" || direction == "right";
+    return direction == "west" || direction == "east";
 }
 
 bool MapConnection::isVertical(const QString &direction) {
-    return direction == "up" || direction == "down";
+    return direction == "north" || direction == "south";
+}
+
+bool MapConnection::isDiagonal(const QString &direction) {
+    return direction == "northwest" || direction == "northeast"
+        || direction == "southwest" || direction == "southeast";
 }
 
 bool MapConnection::isDiving(const QString &direction) {
