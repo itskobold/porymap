@@ -18,10 +18,12 @@ public:
     void setCollision(uint16_t collision);
     void setElevation(uint16_t elevation);
     void setLocation(uint16_t location);
+    void setBiome(uint16_t biome);
     uint16_t metatileId() const { return m_metatileId; }
     uint16_t collision() const { return m_collision; }
     uint16_t elevation() const { return m_elevation; }
     uint16_t location() const { return m_location; }
+    uint16_t biome() const { return m_biome; }
     uint16_t rawValue() const;
     uint8_t attributesValue() const;
     void setAttributes(uint8_t data);
@@ -30,6 +32,7 @@ public:
     static uint16_t getMaxCollision();
     static uint16_t getMaxElevation();
     static uint16_t getMaxLocation();
+    static uint16_t getMaxBiome();
 
     static const uint16_t maxValue;
 
@@ -37,9 +40,12 @@ private:
     uint16_t m_metatileId;
     uint16_t m_collision;
     uint16_t m_elevation;
-    // Per-tile location field, packed into the attribute byte alongside collision and
-    // elevation (default mask 0xC0, i.e. 4 possible values). Editable via the Locations tab.
+    // Per-tile location field, packed into the map.bin word alongside the metatile id and
+    // biome (default mask 0x0C00, i.e. 4 possible values). Editable via the Locations tab.
     uint16_t m_location;
+    // Per-tile biome field, packed into the map.bin word (default mask 0xF000). Currently
+    // unused by the engine.
+    uint16_t m_biome;
 };
 
 #endif // BLOCK_H

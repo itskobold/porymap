@@ -101,7 +101,8 @@ const QMap<ProjectIdentifier, QPair<QString, QString>> ProjectConfig::defaultIde
     {ProjectIdentifier::define_mask_metatile,          {"define_mask_metatile",          "MAPGRID_METATILE_ID_MASK"}},
     {ProjectIdentifier::define_mask_collision,         {"define_mask_collision",         "MAPATTR_COLLISION_MASK"}},
     {ProjectIdentifier::define_mask_elevation,         {"define_mask_elevation",         "MAPATTR_ELEVATION_MASK"}},
-    {ProjectIdentifier::define_mask_location,          {"define_mask_location",          "MAPATTR_LOCATION_MASK"}},
+    {ProjectIdentifier::define_mask_location,          {"define_mask_location",          "MAPGRID_LOCATION_MASK"}},
+    {ProjectIdentifier::define_mask_biome,             {"define_mask_biome",             "MAPGRID_BIOME_MASK"}},
     {ProjectIdentifier::define_mask_behavior,          {"define_mask_behavior",          "METATILE_ATTR_BEHAVIOR_MASK"}},
     {ProjectIdentifier::define_mask_layer,             {"define_mask_layer",             "METATILE_ATTR_LAYER_MASK"}},
     {ProjectIdentifier::define_attribute_behavior,     {"define_attribute_behavior",     "METATILE_ATTRIBUTE_BEHAVIOR"}},
@@ -962,6 +963,8 @@ void ProjectConfig::parseConfigKeyValue(QString key, QString value) {
         this->blockElevationMask = getConfigUint32(key, value, 0, Block::maxValue);
     } else if (key == "block_location_mask") {
         this->blockLocationMask = getConfigUint32(key, value, 0, Block::maxValue);
+    } else if (key == "block_biome_mask") {
+        this->blockBiomeMask = getConfigUint32(key, value, 0, Block::maxValue);
     } else if (key == "unused_tile_normal") {
         this->unusedTileNormal = getConfigUint32(key, value, 0, Tile::maxValue);
     } else if (key == "unused_tile_covered") {
@@ -1129,6 +1132,7 @@ QMap<QString, QString> ProjectConfig::getKeyValueMap() {
     map.insert("block_collision_mask", Util::toHexString(this->blockCollisionMask));
     map.insert("block_elevation_mask", Util::toHexString(this->blockElevationMask));
     map.insert("block_location_mask", Util::toHexString(this->blockLocationMask));
+    map.insert("block_biome_mask", Util::toHexString(this->blockBiomeMask));
     map.insert("unused_tile_normal", Util::toHexString(this->unusedTileNormal));
     map.insert("unused_tile_covered", Util::toHexString(this->unusedTileCovered));
     map.insert("unused_tile_split", Util::toHexString(this->unusedTileSplit));

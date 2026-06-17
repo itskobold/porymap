@@ -2537,6 +2537,7 @@ bool Project::readFieldmapMasks() {
     const QString collisionMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_collision);
     const QString elevationMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_elevation);
     const QString locationMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_location);
+    const QString biomeMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_biome);
     const QString behaviorMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_behavior);
     const QString layerTypeMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_layer);
 
@@ -2545,6 +2546,7 @@ bool Project::readFieldmapMasks() {
                                                                      collisionMaskName,
                                                                      elevationMaskName,
                                                                      locationMaskName,
+                                                                     biomeMaskName,
                                                                      behaviorMaskName,
                                                                      layerTypeMaskName,
     });
@@ -2580,6 +2582,8 @@ bool Project::readFieldmapMasks() {
         projectConfig.blockElevationMask = blockMask;
     if (readBlockMask(locationMaskName, &blockMask))
         projectConfig.blockLocationMask = blockMask;
+    if (readBlockMask(biomeMaskName, &blockMask))
+        projectConfig.blockBiomeMask = blockMask;
     Block::setLayout();
 
     // Read RSE metatile attribute masks

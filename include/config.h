@@ -213,6 +213,7 @@ enum ProjectIdentifier {
     define_mask_collision,
     define_mask_elevation,
     define_mask_location,
+    define_mask_biome,
     define_mask_behavior,
     define_mask_layer,
     define_attribute_behavior,
@@ -326,12 +327,14 @@ public:
         this->collisionSheetPath = QString();
         this->collisionSheetSize = QSize(2, 16);
         this->playerViewDistance = QMargins(GBA_H_DIST_TO_CENTER, GBA_V_DIST_TO_CENTER, GBA_H_DIST_TO_CENTER, GBA_V_DIST_TO_CENTER);
-        // Split metatile-id/attributes format: map.bin holds a full 16-bit metatile id,
-        // while collision and elevation live in a separate per-tile attribute byte.
-        this->blockMetatileIdMask = 0xFFFF;
-        this->blockCollisionMask = 0x03;
-        this->blockElevationMask = 0x3C;
-        this->blockLocationMask = 0xC0;
+        // Split metatile-id/attributes format: the map.bin word packs metatile id
+        // (bits 0-9), location (bits 10-11) and biome (bits 12-15), while collision
+        // (bit 0) and elevation (bits 1-7) live in a separate per-tile attribute byte.
+        this->blockMetatileIdMask = 0x03FF;
+        this->blockCollisionMask = 0x01;
+        this->blockElevationMask = 0xFE;
+        this->blockLocationMask = 0x0C00;
+        this->blockBiomeMask = 0xF000;
         this->unusedTileNormal = 0x3014;
         this->unusedTileCovered = 0x0000;
         this->unusedTileSplit = 0x0000;
@@ -407,6 +410,7 @@ public:
     uint16_t blockCollisionMask;
     uint16_t blockElevationMask;
     uint16_t blockLocationMask;
+    uint16_t blockBiomeMask;
     uint16_t unusedTileNormal;
     uint16_t unusedTileCovered;
     uint16_t unusedTileSplit;
