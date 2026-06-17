@@ -47,6 +47,8 @@ int getConnectionDirectionMask(const QList<QString> &directions) {
 void renderBlocks(Layout *layout, bool ignoreCache = false) {
     layout->layoutItem->draw(ignoreCache);
     layout->collisionItem->draw(ignoreCache);
+    if (layout->locationItem)
+        layout->locationItem->draw(ignoreCache);
 }
 
 PaintMetatile::PaintMetatile(Layout *layout,

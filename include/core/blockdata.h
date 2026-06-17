@@ -11,6 +11,7 @@ class Blockdata : public QVector<Block>
 {
 public:
     QByteArray serialize() const;
+    QByteArray serializeAttributes() const;
 };
 
 #endif // BLOCKDATA_H

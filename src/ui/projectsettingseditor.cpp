@@ -269,8 +269,10 @@ void ProjectSettingsEditor::updateMaskOverlapWarning(QLabel * warning, QList<UIn
 }
 
 void ProjectSettingsEditor::updateBlockMaskOverlapWarning() {
+    // The metatile id occupies its own 16-bit word (map.bin), so it's expected to
+    // overlap the attribute masks and is excluded here. Collision and elevation share
+    // the per-tile attribute byte (attributes.bin), so they're still checked together.
     const auto masks = QList<UIntSpinBox*>{
-        ui->spinBox_MetatileIdMask,
         ui->spinBox_CollisionMask,
         ui->spinBox_ElevationMask,
     };

@@ -22,6 +22,7 @@
 #include "divingmappixmapitem.h"
 #include "currentselectedmetatilespixmapitem.h"
 #include "collisionpixmapitem.h"
+#include "locationpixmapitem.h"
 #include "layoutpixmapitem.h"
 #include "settings.h"
 #include "gridsettings.h"
@@ -73,10 +74,12 @@ public:
     void displayMetatileSelector();
     void displayMapMetatiles();
     void displayMapMovementPermissions();
+    void displayMapLocations();
     void displayBorderMetatiles();
     void displayCurrentMetatilesSelection();
     void redrawCurrentMetatilesSelection();
     void displayMovementPermissionSelector();
+    void displayLocationSelector();
     void displayMapEvents();
     void displayMapConnections();
     void displayMapBorder();
@@ -136,6 +139,7 @@ public:
     QMap<QString, QPointer<DivingMapPixmapItem>> diving_map_items;
     QGraphicsPathItem *connection_mask = nullptr;
     QPointer<CollisionPixmapItem> collision_item = nullptr;
+    QPointer<LocationPixmapItem> location_item = nullptr;
     QGraphicsItemGroup *events_group = nullptr;
 
     QList<QGraphicsPixmapItem*> borderItems;
@@ -149,11 +153,13 @@ public:
     QPointer<QGraphicsScene> scene_current_metatile_selection = nullptr;
     QPointer<QGraphicsScene> scene_selected_border_metatiles = nullptr;
     QPointer<QGraphicsScene> scene_collision_metatiles = nullptr;
+    QPointer<QGraphicsScene> scene_location_metatiles = nullptr;
     QPointer<MetatileSelector> metatile_selector_item = nullptr;
 
     QPointer<BorderMetatilesPixmapItem> selected_border_metatiles_item = nullptr;
     CurrentSelectedMetatilesPixmapItem *current_metatile_selection_item = nullptr;
     QPointer<MovementPermissionsSelector> movement_permissions_selector_item = nullptr;
+    QPointer<MovementPermissionsSelector> location_selector_item = nullptr;
 
     QList<Event*> selectedEvents;
     QPointer<ConnectionPixmapItem> selected_connection_item = nullptr;
@@ -165,7 +171,7 @@ public:
     EditAction getMapEditAction() const { return this->mapEditAction; }
     EditAction getEventEditAction() const { return this->eventEditAction; }
 
-    enum class EditMode { None, Disabled, Metatiles, Collision, Header, Events, Connections, Encounters };
+    enum class EditMode { None, Disabled, Metatiles, Collision, Locations, Header, Events, Connections, Encounters };
     void setEditMode(EditMode editMode);
     EditMode getEditMode() const { return this->editMode; }
 
@@ -175,7 +181,9 @@ public:
 
     int scaleIndex = 2;
     qreal collisionOpacity = 0.5;
+    qreal locationOpacity = 0.5;
     static QList<QList<const QImage*>> collisionIcons;
+    static QList<const QImage*> locationIcons;
 
     int eventShiftActionId = 0;
     int eventMoveActionId = 0;
@@ -187,6 +195,7 @@ public:
     void openMapJson(const QString &mapName) const;
     void openLayoutJson(const QString &layoutId) const;
     void setCollisionGraphics();
+    void setLocationGraphics();
 
     enum ZValue {
         MapBorder = -4,
@@ -219,6 +228,9 @@ private:
     const QImage collisionPlaceholder = QImage(":/images/collisions_unknown.png");
     QPixmap collisionSheetPixmap;
 
+    const QImage defaultLocationImgSheet = QImage(":/images/locations.png");
+    QPixmap locationSheetPixmap;
+
     EditMode editMode = EditMode::None;
 
     EditAction mapEditAction = EditAction::Paint;
@@ -228,8 +240,10 @@ private:
     void clearMap();
     void clearMetatileSelector();
     void clearMovementPermissionSelector();
+    void clearLocationSelector();
     void clearMapMetatiles();
     void clearMapMovementPermissions();
+    void clearMapLocations();
     void clearBorderMetatiles();
     void clearCurrentMetatilesSelection();
     void clearMapEvents();
@@ -250,6 +264,7 @@ private:
     QString getMovementPermissionText(uint16_t collision, uint16_t elevation);
     QString getMetatileDisplayMessage(uint16_t metatileId);
     void setCollisionTabSpinBoxes(uint16_t collision, uint16_t elevation);
+    void setLocationTabSpinBoxes(uint16_t location);
     void adjustStraightPathPos(QGraphicsSceneMouseEvent *event, LayoutPixmapItem *item, QPoint *pos) const;
     static bool startDetachedProcess(const QString &command,
                                     const QString &workingDirectory = QString(),

@@ -578,6 +578,7 @@ Layout *Project::createNewLayout(const Layout::Settings &settings, const Layout 
     layout->newFolderPath = folderPath;
     layout->border_path = folderPath + "/border.bin";
     layout->blockdata_path = folderPath + "/map.bin";
+    layout->attributes_path = folderPath + "/attributes.bin";
 
     if (layout->blockdata.isEmpty()) {
         // Fill layout using default fill settings
@@ -681,6 +682,14 @@ bool Project::readMapLayouts() {
         layout->tileset_secondary_label = ParseUtil::jsonToQString(layoutObj.take("secondary_tileset"));
         layout->border_path = ParseUtil::jsonToQString(layoutObj.take("border_filepath"));
         layout->blockdata_path = ParseUtil::jsonToQString(layoutObj.take("blockdata_filepath"));
+
+        // The per-tile attribute file (collision/elevation) lives alongside the blockdata
+        // file. It can be specified explicitly, otherwise it's derived as map.bin -> attributes.bin.
+        if (layoutObj.contains("attributes_filepath")) {
+            layout->attributes_path = ParseUtil::jsonToQString(layoutObj.take("attributes_filepath"));
+        } else {
+            layout->attributes_path = layout->blockdata_path.left(layout->blockdata_path.lastIndexOf('/') + 1) + "attributes.bin";
+        }
 
         layout->customData = layoutObj;
 
@@ -2438,6 +2447,7 @@ bool Project::readFieldmapMasks() {
     const QString metatileIdMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_metatile);
     const QString collisionMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_collision);
     const QString elevationMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_elevation);
+    const QString locationMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_location);
     const QString behaviorMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_behavior);
     const QString layerTypeMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_layer);
 
@@ -2445,6 +2455,7 @@ bool Project::readFieldmapMasks() {
     const auto defines = parser.readCDefinesByName(globalFieldmap, { metatileIdMaskName,
                                                                      collisionMaskName,
                                                                      elevationMaskName,
+                                                                     locationMaskName,
                                                                      behaviorMaskName,
                                                                      layerTypeMaskName,
     });
@@ -2478,6 +2489,8 @@ bool Project::readFieldmapMasks() {
         projectConfig.blockCollisionMask = blockMask;
     if (readBlockMask(elevationMaskName, &blockMask))
         projectConfig.blockElevationMask = blockMask;
+    if (readBlockMask(locationMaskName, &blockMask))
+        projectConfig.blockLocationMask = blockMask;
     Block::setLayout();
 
     // Read RSE metatile attribute masks

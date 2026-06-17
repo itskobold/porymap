@@ -9,3 +9,10 @@ QByteArray Blockdata::serialize() const {
     }
     return data;
 }
+
+QByteArray Blockdata::serializeAttributes() const {
+    QByteArray data;
+    for (const auto &block : *this)
+        data.append(static_cast<char>(block.attributesValue()));
+    return data;
+}

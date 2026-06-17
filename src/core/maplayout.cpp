@@ -30,6 +30,7 @@ void Layout::copyFrom(const Layout *other) {
     this->border_height = other->border_height;
     this->border_path = other->border_path;
     this->blockdata_path = other->blockdata_path;
+    this->attributes_path = other->attributes_path;
     this->tileset_primary_label = other->tileset_primary_label;
     this->tileset_secondary_label = other->tileset_secondary_label;
     this->tileset_primary = other->tileset_primary;
@@ -170,6 +171,12 @@ void Layout::cacheCollision() {
     this->cached_collision.clear();
     for (const auto &block : this->blockdata)
         this->cached_collision.append(block);
+}
+
+void Layout::cacheLocation() {
+    this->cached_location.clear();
+    for (const auto &block : this->blockdata)
+        this->cached_location.append(block);
 }
 
 bool Layout::layoutBlockChanged(int i, const Blockdata &curData, const Blockdata &cache) {
@@ -359,6 +366,63 @@ void Layout::magicFillCollisionElevation(int initialX, int initialY, uint16_t co
     }
 }
 
+void Layout::_floodFillLocation(int x, int y, uint16_t location) {
+    QList<QPoint> todo;
+    todo.append(QPoint(x, y));
+    while (todo.length()) {
+        QPoint point = todo.takeAt(0);
+        x = point.x();
+        y = point.y();
+        Block block;
+        if (!getBlock(x, y, &block)) {
+            continue;
+        }
+
+        uint old_loc = block.location();
+        if (old_loc == location) {
+            continue;
+        }
+
+        block.setLocation(location);
+        setBlock(x, y, block, true);
+        if (getBlock(x + 1, y, &block) && block.location() == old_loc) {
+            todo.append(QPoint(x + 1, y));
+        }
+        if (getBlock(x - 1, y, &block) && block.location() == old_loc) {
+            todo.append(QPoint(x - 1, y));
+        }
+        if (getBlock(x, y + 1, &block) && block.location() == old_loc) {
+            todo.append(QPoint(x, y + 1));
+        }
+        if (getBlock(x, y - 1, &block) && block.location() == old_loc) {
+            todo.append(QPoint(x, y - 1));
+        }
+    }
+}
+
+void Layout::floodFillLocation(int x, int y, uint16_t location) {
+    Block block;
+    if (getBlock(x, y, &block) && block.location() != location) {
+        _floodFillLocation(x, y, location);
+    }
+}
+
+void Layout::magicFillLocation(int initialX, int initialY, uint16_t location) {
+    Block block;
+    if (getBlock(initialX, initialY, &block) && block.location() != location) {
+        uint old_loc = block.location();
+
+        for (int y = 0; y < getHeight(); y++) {
+            for (int x = 0; x < getWidth(); x++) {
+                if (getBlock(x, y, &block) && block.location() == old_loc) {
+                    block.setLocation(location);
+                    setBlock(x, y, block, true);
+                }
+            }
+        }
+    }
+}
+
 QPixmap Layout::render(bool ignoreCache, Layout *fromLayout, const QRect &bounds) {
     bool changed_any = false;
     if (this->image.isNull() || this->image.width() != pixelWidth() || this->image.height() != pixelHeight()) {
@@ -443,6 +507,36 @@ QPixmap Layout::renderCollision(bool ignoreCache) {
     return collision_pixmap;
 }
 
+QPixmap Layout::renderLocation(bool ignoreCache) {
+    bool changed_any = false;
+    if (location_image.isNull() || location_image.width() != pixelWidth() || location_image.height() != pixelHeight()) {
+        location_image = QImage(pixelWidth(), pixelHeight(), QImage::Format_RGBA8888);
+        changed_any = true;
+    }
+    if (this->blockdata.isEmpty() || this->width == 0 || this->height == 0) {
+        location_pixmap = location_pixmap.fromImage(location_image);
+        return location_pixmap;
+    }
+    QPainter painter(&location_image);
+    for (int i = 0; i < this->blockdata.length(); i++) {
+        if (!ignoreCache && !layoutBlockChanged(i, this->blockdata, this->cached_location)) {
+            continue;
+        }
+        changed_any = true;
+        Block block = this->blockdata.at(i);
+        QImage location_metatile_image = getLocationMetatileImage(block);
+        int x = this->width ? ((i % this->width) * Metatile::pixelWidth()) : 0;
+        int y = this->width ? ((i / this->width) * Metatile::pixelHeight()) : 0;
+        painter.drawImage(x, y, location_metatile_image);
+    }
+    painter.end();
+    cacheLocation();
+    if (changed_any) {
+        location_pixmap = location_pixmap.fromImage(location_image);
+    }
+    return location_pixmap;
+}
+
 QPixmap Layout::renderBorder(bool ignoreCache) {
     bool changed_any = false, border_resized = false;
     int pixelWidth = this->border_width * Metatile::pixelWidth();
@@ -518,7 +612,12 @@ bool Layout::saveBorder(const QString &root) {
 
 bool Layout::saveBlockdata(const QString &root) {
     QString path = QString("%1/%2").arg(root).arg(this->blockdata_path);
-    return writeBlockdata(path, this->blockdata);
+    if (!writeBlockdata(path, this->blockdata))
+        return false;
+
+    // Collision and elevation are stored alongside the metatile blockdata in a separate file.
+    QString attributesPath = QString("%1/%2").arg(root).arg(this->attributes_path);
+    return writeAttributes(attributesPath, this->blockdata);
 }
 
 bool Layout::writeBlockdata(const QString &path, const Blockdata &blockdata) const {
@@ -529,6 +628,18 @@ bool Layout::writeBlockdata(const QString &path, const Blockdata &blockdata) con
     }
 
     QByteArray data = blockdata.serialize();
+    file.write(data);
+    return true;
+}
+
+bool Layout::writeAttributes(const QString &path, const Blockdata &blockdata) const {
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
+        logError(QString("Failed to write '%1' for %2: %3").arg(path).arg(this->name).arg(file.errorString()));
+        return false;
+    }
+
+    QByteArray data = blockdata.serializeAttributes();
     file.write(data);
     return true;
 }
@@ -603,6 +714,17 @@ bool Layout::loadBlockdata(const QString &root) {
         this->blockdata.resize(expectedSize);
     }
 
+    // Collision and elevation are stored separately from the metatile blockdata.
+    if (!this->attributes_path.isEmpty()) {
+        QString attrError;
+        QString attrPath = QString("%1/%2").arg(root).arg(this->attributes_path);
+        readAttributes(attrPath, &this->blockdata, &attrError);
+        if (!attrError.isEmpty()) {
+            logError(QString("Failed to load attributes for %1 from '%2': %3").arg(this->name).arg(attrPath).arg(attrError));
+            return false;
+        }
+    }
+
     this->lastCommitBlocks.blocks = this->blockdata;
     this->lastCommitBlocks.layoutDimensions = QSize(this->width, this->height);
 
@@ -624,4 +746,23 @@ Blockdata Layout::readBlockdata(const QString &path, QString *error) {
     }
 
     return blockdata;
+}
+
+// Reads the per-tile attribute byte (collision + elevation) for each block, in order.
+void Layout::readAttributes(const QString &path, Blockdata *blockdata, QString *error) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        if (error) *error = file.errorString();
+        return;
+    }
+
+    QByteArray data = file.readAll();
+    if (data.length() < blockdata->count()) {
+        logWarn(QString("Attributes length %1 is shorter than blockdata length %2 in '%3'. Missing attributes default to 0.")
+                .arg(data.length()).arg(blockdata->count()).arg(path));
+    }
+    for (int i = 0; i < blockdata->count(); i++) {
+        uint8_t attr = (i < data.length()) ? static_cast<uint8_t>(data[i] & 0xff) : 0;
+        (*blockdata)[i].setAttributes(attr);
+    }
 }

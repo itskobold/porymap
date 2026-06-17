@@ -12,6 +12,15 @@ QImage getCollisionMetatileImage(int collision, int elevation) {
     return image ? *image : QImage();
 }
 
+QImage getLocationMetatileImage(Block block) {
+    return getLocationMetatileImage(block.location());
+}
+
+QImage getLocationMetatileImage(int location) {
+    const QImage * image = Editor::locationIcons.value(location);
+    return image ? *image : QImage();
+}
+
 QImage getMetatileImage(uint16_t metatileId, const Layout *layout, bool useTruePalettes) {
     Metatile* metatile = Tileset::getMetatile(metatileId,
                                               layout ? layout->tileset_primary : nullptr,

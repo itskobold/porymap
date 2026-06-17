@@ -12,6 +12,7 @@
 class Map;
 class LayoutPixmapItem;
 class CollisionPixmapItem;
+class LocationPixmapItem;
 class BorderMetatilesPixmapItem;
 
 class Layout : public QObject {
@@ -38,6 +39,7 @@ public:
 
     QString border_path;
     QString blockdata_path;
+    QString attributes_path;
 
     QString tileset_primary_label;
     QString tileset_secondary_label;
@@ -55,10 +57,13 @@ public:
     QPixmap border_pixmap;
     QImage collision_image;
     QPixmap collision_pixmap;
+    QImage location_image;
+    QPixmap location_pixmap;
 
     Blockdata border;
     Blockdata cached_blockdata;
     Blockdata cached_collision;
+    Blockdata cached_location;
     Blockdata cached_border;
     struct {
         Blockdata blocks;
@@ -89,6 +94,7 @@ public:
 
     LayoutPixmapItem *layoutItem = nullptr;
     CollisionPixmapItem *collisionItem = nullptr;
+    LocationPixmapItem *locationItem = nullptr;
     BorderMetatilesPixmapItem *borderItem = nullptr;
 
     QUndoStack editHistory;
@@ -139,6 +145,7 @@ public:
 
     void cacheBlockdata();
     void cacheCollision();
+    void cacheLocation();
     void clearBorderCache();
     void cacheBorder();
 
@@ -161,14 +168,20 @@ public:
     void _floodFillCollisionElevation(int x, int y, uint16_t collision, uint16_t elevation);
     void magicFillCollisionElevation(int x, int y, uint16_t collision, uint16_t elevation);
 
+    void floodFillLocation(int x, int y, uint16_t location);
+    void _floodFillLocation(int x, int y, uint16_t location);
+    void magicFillLocation(int x, int y, uint16_t location);
+
     QPixmap render(bool ignoreCache = false, Layout *fromLayout = nullptr, const QRect &bounds = QRect(0, 0, -1, -1));
     QPixmap renderCollision(bool ignoreCache);
+    QPixmap renderLocation(bool ignoreCache);
     QPixmap renderBorder(bool ignoreCache = false);
 
     QPixmap getLayoutItemPixmap();
 
     void setLayoutItem(LayoutPixmapItem *item) { layoutItem = item; }
     void setCollisionItem(CollisionPixmapItem *item) { collisionItem = item; }
+    void setLocationItem(LocationPixmapItem *item) { locationItem = item; }
     void setBorderItem(BorderMetatilesPixmapItem *item) { borderItem = item; }
 
     bool metatileIsValid(uint16_t metatileId) { return Tileset::metatileIsValid(metatileId, this->tileset_primary, this->tileset_secondary); }
@@ -177,7 +190,9 @@ private:
     void setNewDimensionsBlockdata(int newWidth, int newHeight);
     void setNewBorderDimensionsBlockdata(int newWidth, int newHeight);
     bool writeBlockdata(const QString &path, const Blockdata &blockdata) const;
+    bool writeAttributes(const QString &path, const Blockdata &blockdata) const;
     static Blockdata readBlockdata(const QString &path, QString *error);
+    static void readAttributes(const QString &path, Blockdata *blockdata, QString *error);
 
     static int getBorderDrawDistance(int dimension, qreal minimum);
 

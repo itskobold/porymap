@@ -26,6 +26,9 @@ static bool selectNewEvents = false;
 // 2D array mapping collision+elevation combos to an icon.
 QList<QList<const QImage*>> Editor::collisionIcons;
 
+// Array mapping location values to an icon.
+QList<const QImage*> Editor::locationIcons;
+
 Editor::Editor(Ui::MainWindow* ui)
 {
     this->ui = ui;
@@ -76,6 +79,7 @@ Editor::~Editor()
     delete this->map_ruler;
     for (auto sublist : collisionIcons)
         qDeleteAll(sublist);
+    qDeleteAll(locationIcons);
 
     closeProject();
 }
@@ -126,7 +130,8 @@ void Editor::closeProject() {
 }
 
 bool Editor::getEditingLayout() const {
-    return this->editMode == EditMode::Metatiles || this->editMode == EditMode::Collision;
+    return this->editMode == EditMode::Metatiles || this->editMode == EditMode::Collision
+        || this->editMode == EditMode::Locations;
 }
 
 void Editor::setEditMode(EditMode editMode) {
@@ -135,11 +140,12 @@ void Editor::setEditMode(EditMode editMode) {
     auto oldEditMode = this->editMode;
     this->editMode = editMode;
 
-    if (!map_item || !collision_item) return;
+    if (!map_item || !collision_item || !location_item) return;
     if (!this->layout) return;
 
     map_item->setVisible(true); // is map item ever not visible
     collision_item->setVisible(false);
+    location_item->setVisible(false);
 
     switch (this->editMode) {
     case EditMode::Metatiles:
@@ -150,6 +156,9 @@ void Editor::setEditMode(EditMode editMode) {
     case EditMode::Collision:
         current_view = collision_item;
         break;
+    case EditMode::Locations:
+        current_view = location_item;
+        break;
     default:
         current_view = nullptr;
         break;
@@ -157,6 +166,7 @@ void Editor::setEditMode(EditMode editMode) {
 
     map_item->draw();
     collision_item->draw();
+    location_item->draw();
 
     if (current_view) current_view->setVisible(true);
 
@@ -237,12 +247,16 @@ void Editor::setEditAction(EditAction editAction) {
                 this->map_item->unsetCursor();
             if (this->collision_item)
                 this->collision_item->unsetCursor();
+            if (this->location_item)
+                this->location_item->unsetCursor();
         } else {
             auto cursor = cursors.value(editAction);
             if (this->map_item)
                 this->map_item->setCursor(cursor);
             if (this->collision_item)
                 this->collision_item->setCursor(cursor);
+            if (this->location_item)
+                this->location_item->setCursor(cursor);
         }
     }
     emit editActionSet(editAction);
@@ -1165,7 +1179,8 @@ void Editor::scaleMapView(int s) {
 }
 
 bool Editor::isMouseInMap() const {
-    return (this->map_item && this->map_item->has_mouse) || (this->collision_item && this->collision_item->has_mouse);
+    return (this->map_item && this->map_item->has_mouse) || (this->collision_item && this->collision_item->has_mouse)
+        || (this->location_item && this->location_item->has_mouse);
 }
 
 void Editor::setPlayerViewRect(const QRectF &rect) {
@@ -1261,6 +1276,11 @@ void Editor::setStatusFromMapPos(const QPoint &pos) {
                               .arg(pos.x())
                               .arg(pos.y())
                               .arg(this->getMovementPermissionText(block.collision(), block.elevation())));
+    } else if (this->editMode == EditMode::Locations) {
+        this->ui->statusBar->showMessage(QString("X: %1, Y: %2, Location: %3")
+                              .arg(pos.x())
+                              .arg(pos.y())
+                              .arg(block.location()));
     } else if (this->editMode == EditMode::Events) {
         this->ui->statusBar->showMessage(QString("X: %1, Y: %2, Scale = %3x")
                               .arg(pos.x())
@@ -1446,12 +1466,15 @@ void Editor::mouseEvent_map(QGraphicsSceneMouseEvent *event, LayoutPixmapItem *i
 
     QPoint pos = Metatile::coordFromPixmapCoord(event->pos());
 
-    if (this->editMode == EditMode::Metatiles || this->editMode == EditMode::Collision) {
+    if (this->editMode == EditMode::Metatiles || this->editMode == EditMode::Collision || this->editMode == EditMode::Locations) {
         if (editAction == EditAction::Paint) {
             if (event->buttons() & Qt::RightButton) {
                 if (this->editMode == EditMode::Collision) {
                     auto collisionItem = dynamic_cast<CollisionPixmapItem*>(item);
                     if (collisionItem) collisionItem->updateMovementPermissionSelection(event);
+                } else if (this->editMode == EditMode::Locations) {
+                    auto locationItem = dynamic_cast<LocationPixmapItem*>(item);
+                    if (locationItem) locationItem->updateLocationSelection(event);
                 } else {
                     item->updateMetatileSelection(event);
                 }
@@ -1566,6 +1589,7 @@ void Editor::clearMap() {
     }
     delete metatile_selector_item;
     delete movement_permissions_selector_item;
+    delete location_selector_item;
 }
 
 bool Editor::displayMap() {
@@ -1596,6 +1620,8 @@ bool Editor::displayLayout() {
     displayMapMetatiles();
     displayMovementPermissionSelector();
     displayMapMovementPermissions();
+    displayLocationSelector();
+    displayMapLocations();
     displayBorderMetatiles();
     displayCurrentMetatilesSelection();
     displayMapBorder();
@@ -1607,6 +1633,9 @@ bool Editor::displayLayout() {
     }
     if (collision_item) {
         collision_item->setVisible(false);
+    }
+    if (location_item) {
+        location_item->setVisible(false);
     }
 
     return true;
@@ -1685,6 +1714,27 @@ void Editor::displayMapMovementPermissions() {
     scene->addItem(collision_item);
 }
 
+void Editor::clearMapLocations() {
+    if (location_item && scene) {
+        scene->removeItem(location_item);
+        delete location_item;
+    }
+}
+
+void Editor::displayMapLocations() {
+    clearMapLocations();
+
+    location_item = new LocationPixmapItem(this->layout, ui->spinBox_SelectedLocation,
+                                           this->metatile_selector_item, this->settings, &this->locationOpacity);
+    connect(location_item, &LocationPixmapItem::mouseEvent, this, &Editor::mouseEvent_map);
+    connect(location_item, &LocationPixmapItem::hoverEntered, this, &Editor::onMapHoverEntered);
+    connect(location_item, &LocationPixmapItem::hoverChanged, this, &Editor::onMapHoverChanged);
+    connect(location_item, &LocationPixmapItem::hoverCleared, this, &Editor::onMapHoverCleared);
+
+    location_item->draw(true);
+    scene->addItem(location_item);
+}
+
 void Editor::clearBorderMetatiles() {
     if (selected_border_metatiles_item && selected_border_metatiles_item->scene()) {
         selected_border_metatiles_item->scene()->removeItem(selected_border_metatiles_item);
@@ -1759,6 +1809,30 @@ void Editor::displayMovementPermissionSelector() {
     }
 
     scene_collision_metatiles->addItem(movement_permissions_selector_item);
+}
+
+void Editor::clearLocationSelector() {
+    if (location_selector_item && location_selector_item->scene()) {
+        location_selector_item->scene()->removeItem(location_selector_item);
+        delete scene_location_metatiles;
+    }
+}
+
+void Editor::displayLocationSelector() {
+    clearLocationSelector();
+
+    scene_location_metatiles = new QGraphicsScene;
+    if (!location_selector_item) {
+        // The location selector reuses the movement-permissions selector widget, treating the
+        // single-column locations sheet as a vertical strip of values (selection row = location).
+        location_selector_item = new MovementPermissionsSelector(this->locationSheetPixmap);
+        connect(location_selector_item, &SelectablePixmapItem::selectionChanged, [this](const QPoint &pos, const QSize&) {
+            this->setLocationTabSpinBoxes(pos.y());
+        });
+        location_selector_item->select(0, 0);
+    }
+
+    scene_location_metatiles->addItem(location_selector_item);
 }
 
 void Editor::clearMapEvents() {
@@ -2406,6 +2480,39 @@ void Editor::setCollisionTabSpinBoxes(uint16_t collision, uint16_t elevation) {
     const QSignalBlocker blocker2(ui->spinBox_SelectedElevation);
     ui->spinBox_SelectedCollision->setValue(collision);
     ui->spinBox_SelectedElevation->setValue(elevation);
+}
+
+void Editor::setLocationTabSpinBoxes(uint16_t location) {
+    const QSignalBlocker blocker(ui->spinBox_SelectedLocation);
+    ui->spinBox_SelectedLocation->setValue(location);
+}
+
+// Builds the location selector pixmap and the per-value location icons from locations.png.
+void Editor::setLocationGraphics() {
+    QImage imgSheet = this->defaultLocationImgSheet;
+
+    // The location sheet is a single column with one row per location value.
+    const int imgColumns = 1;
+    const int imgRows = Block::getMaxLocation() + 1;
+
+    // Create a pixmap for the selector on the Locations tab. If a project was previously opened we'll also need to refresh the selector.
+    this->locationSheetPixmap = QPixmap::fromImage(imgSheet).scaled(MovementPermissionsSelector::CellWidth * imgColumns,
+                                                                    MovementPermissionsSelector::CellHeight * imgRows);
+    if (this->location_selector_item)
+        this->location_selector_item->setBasePixmap(this->locationSheetPixmap);
+
+    qDeleteAll(locationIcons);
+    locationIcons.clear();
+
+    // Use the image sheet to create an icon for each location value.
+    const int w = Metatile::pixelWidth(), h = Metatile::pixelHeight();
+    imgSheet = imgSheet.scaled(w * imgColumns, h * imgRows);
+    for (int location = 0; location <= Block::getMaxLocation(); location++) {
+        // If (location >= imgRows) here, it's a valid location value with no icon on the
+        // image sheet; fall back to the last available icon.
+        int y = ((location < imgRows) ? location : (imgRows - 1)) * h;
+        locationIcons.append(new QImage(imgSheet.copy(0, y, w, h)));
+    }
 }
 
 // Custom collision graphics may be provided by the user.

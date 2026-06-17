@@ -294,6 +294,9 @@ private slots:
     void on_pushButton_CreatePrefab_clicked();
     void on_spinBox_SelectedElevation_valueChanged(int elevation);
     void on_spinBox_SelectedCollision_valueChanged(int collision);
+    void on_spinBox_SelectedLocation_valueChanged(int location);
+    void on_horizontalSlider_LocationTransparency_valueChanged(int value);
+    void on_horizontalSlider_LocationZoom_valueChanged(int value);
     void on_actionRegion_Map_Editor_triggered();
     void on_actionPreferences_triggered();
     void on_actionOpen_Manual_triggered();
@@ -380,6 +383,7 @@ private:
     void refreshMapScene();
     void refreshMetatileViews();
     void refreshCollisionSelector();
+    void refreshLocationSelector();
     void setLayoutOnlyMode(bool layoutOnly);
 
     bool isInvalidProject(Project *project);
@@ -491,6 +495,7 @@ struct MapViewTab {
     enum {
         Metatiles,
         Collision,
+        Locations,
         Prefabs,
     };
 };

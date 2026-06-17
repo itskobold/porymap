@@ -1314,6 +1314,9 @@ void MainWindow::refreshMapScene() {
     //ui->graphicsView_CollisionSelector->setSceneRect(editor->scene_collision_metatiles->sceneRect());
     ui->graphicsView_CollisionSelector->setFixedSize(editor->movement_permissions_selector_item->pixmap().width() + 2, editor->movement_permissions_selector_item->pixmap().height() + 2);
 
+    ui->graphicsView_LocationSelector->setScene(editor->scene_location_metatiles);
+    ui->graphicsView_LocationSelector->setFixedSize(editor->location_selector_item->pixmap().width() + 2, editor->location_selector_item->pixmap().height() + 2);
+
     on_mainTabBar_tabBarClicked(ui->mainTabBar->currentIndex());
 }
 
@@ -1323,6 +1326,10 @@ void MainWindow::refreshMetatileViews() {
 
 void MainWindow::refreshCollisionSelector() {
     on_horizontalSlider_CollisionZoom_valueChanged(ui->horizontalSlider_CollisionZoom->value());
+}
+
+void MainWindow::refreshLocationSelector() {
+    on_horizontalSlider_LocationZoom_valueChanged(ui->horizontalSlider_LocationZoom->value());
 }
 
 // Some events (like warps) have data that refers to an event on a different map.
@@ -1477,6 +1484,8 @@ bool MainWindow::setProjectUI() {
     editor->setCollisionGraphics();
     ui->spinBox_SelectedElevation->setMaximum(Block::getMaxElevation());
     ui->spinBox_SelectedCollision->setMaximum(Block::getMaxCollision());
+    editor->setLocationGraphics();
+    ui->spinBox_SelectedLocation->setMaximum(Block::getMaxLocation());
 
     // map models
     this->mapGroupModel = new MapGroupModel(editor->project);
@@ -2239,6 +2248,7 @@ void MainWindow::on_mapViewTab_tabBarClicked(int index)
     static const QMap<int, Editor::EditMode> tabIndexToEditMode = {
         {MapViewTab::Metatiles, Editor::EditMode::Metatiles},
         {MapViewTab::Collision, Editor::EditMode::Collision},
+        {MapViewTab::Locations, Editor::EditMode::Locations},
         {MapViewTab::Prefabs,   Editor::EditMode::Metatiles},
     };
     if (tabIndexToEditMode.contains(index)) {
@@ -2249,6 +2259,8 @@ void MainWindow::on_mapViewTab_tabBarClicked(int index)
         refreshMetatileViews();
     } else if (index == MapViewTab::Collision) {
         refreshCollisionSelector();
+    } else if (index == MapViewTab::Locations) {
+        refreshLocationSelector();
     } else if (index == MapViewTab::Prefabs) {
         if (projectConfig.prefabFilepath.isEmpty() && !projectConfig.prefabImportPrompted) {
             // User hasn't set up prefabs and hasn't been prompted before.
@@ -2678,6 +2690,12 @@ void MainWindow::on_horizontalSlider_CollisionTransparency_valueChanged(int valu
     this->editor->collisionOpacity = static_cast<qreal>(value) / 100;
     porymapConfig.collisionOpacity = value;
     this->editor->collision_item->draw(true);
+}
+
+void MainWindow::on_horizontalSlider_LocationTransparency_valueChanged(int value) {
+    this->editor->locationOpacity = static_cast<qreal>(value) / 100;
+    if (this->editor->location_item)
+        this->editor->location_item->draw(true);
 }
 
 void MainWindow::on_actionPencil_triggered()     { on_toolButton_Paint_clicked(); }
@@ -3178,6 +3196,23 @@ void MainWindow::on_horizontalSlider_CollisionZoom_valueChanged(int value) {
     ui->scrollAreaWidgetContents_Collision->adjustSize();
 }
 
+void MainWindow::on_horizontalSlider_LocationZoom_valueChanged(int value) {
+    if (!editor->location_selector_item)
+        return;
+    double scale = pow(3.0, static_cast<double>(value - 30) / 30.0);
+
+    QTransform transform;
+    transform.scale(scale, scale);
+    QSize size(editor->location_selector_item->pixmap().width(),
+               editor->location_selector_item->pixmap().height());
+    size *= scale;
+
+    ui->graphicsView_LocationSelector->setResizeAnchor(QGraphicsView::NoAnchor);
+    ui->graphicsView_LocationSelector->setTransform(transform);
+    ui->graphicsView_LocationSelector->setFixedSize(size.width() + 2, size.height() + 2);
+    ui->scrollAreaWidgetContents_Location->adjustSize();
+}
+
 void MainWindow::on_spinBox_SelectedCollision_valueChanged(int collision) {
     if (this->editor && this->editor->movement_permissions_selector_item)
         this->editor->movement_permissions_selector_item->select(collision, ui->spinBox_SelectedElevation->value());
@@ -3186,6 +3221,11 @@ void MainWindow::on_spinBox_SelectedCollision_valueChanged(int collision) {
 void MainWindow::on_spinBox_SelectedElevation_valueChanged(int elevation) {
     if (this->editor && this->editor->movement_permissions_selector_item)
         this->editor->movement_permissions_selector_item->select(ui->spinBox_SelectedCollision->value(), elevation);
+}
+
+void MainWindow::on_spinBox_SelectedLocation_valueChanged(int location) {
+    if (this->editor && this->editor->location_selector_item)
+        this->editor->location_selector_item->select(0, location);
 }
 
 void MainWindow::on_actionRegion_Map_Editor_triggered() {

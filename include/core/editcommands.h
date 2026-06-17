@@ -25,6 +25,9 @@ enum CommandId {
     ID_PaintCollision,
     ID_BucketFillCollision,
     ID_MagicFillCollision,
+    ID_PaintLocation,
+    ID_BucketFillLocation,
+    ID_MagicFillLocation,
     ID_ResizeLayout,
     ID_PaintBorder,
     ID_ScriptEditLayout,
@@ -180,6 +183,53 @@ public:
 
     bool mergeWith(const QUndoCommand *) override { return false; }
     int id() const override { return CommandId::ID_MagicFillCollision; }
+};
+
+
+
+/// Implements a command to commit paint actions on the metatile location field.
+class PaintLocation : public PaintMetatile {
+public:
+    PaintLocation(Layout *layout,
+        const Blockdata &oldLocation, const Blockdata &newLocation,
+        unsigned actionId, QUndoCommand *parent = nullptr)
+    : PaintMetatile(layout, oldLocation, newLocation, actionId, parent) {
+        setText("Paint Location");
+    }
+
+    int id() const override { return CommandId::ID_PaintLocation; }
+};
+
+
+
+/// Implements a command to commit flood fill actions on the metatile location field.
+class BucketFillLocation : public PaintLocation {
+public:
+    BucketFillLocation(Layout *layout,
+        const Blockdata &oldLocation, const Blockdata &newLocation,
+        QUndoCommand *parent = nullptr)
+      : PaintLocation(layout, oldLocation, newLocation, -1, parent) {
+        setText("Flood Fill Location");
+    }
+
+    bool mergeWith(const QUndoCommand *) override { return false; }
+    int id() const override { return CommandId::ID_BucketFillLocation; }
+};
+
+
+
+/// Implements a command to commit magic fill actions on the metatile location field.
+class MagicFillLocation : public PaintLocation {
+public:
+    MagicFillLocation(Layout *layout,
+        const Blockdata &oldLocation, const Blockdata &newLocation,
+        QUndoCommand *parent = nullptr)
+    : PaintLocation(layout, oldLocation, newLocation, -1, parent) {
+        setText("Magic Fill Location");
+    }
+
+    bool mergeWith(const QUndoCommand *) override { return false; }
+    int id() const override { return CommandId::ID_MagicFillLocation; }
 };
 
 

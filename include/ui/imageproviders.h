@@ -11,6 +11,9 @@ class Layout;
 QImage getCollisionMetatileImage(Block);
 QImage getCollisionMetatileImage(int, int);
 
+QImage getLocationMetatileImage(Block);
+QImage getLocationMetatileImage(int);
+
 QImage getMetatileImage(uint16_t, const Layout*, bool useTruePalettes = false);
 QImage getMetatileImage(const Metatile*, const Layout*, bool useTruePalettes = false);
 QImage getMetatileImage(uint16_t, const Tileset*, const Tileset*, const QList<int>& = {0,1,2}, const QList<float>& = {}, bool useTruePalettes = false);
