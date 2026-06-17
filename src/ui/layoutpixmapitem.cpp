@@ -760,11 +760,13 @@ void LayoutPixmapItem::drawLocationErrors() {
     overlay.fill(Qt::transparent);
 
     QPainter painter(&overlay);
+    const QList<MapConnection*> connections = this->map ? this->map->getConnections()
+                                                        : QList<MapConnection*>();
     const int w = this->layout->getWidth();
     const int h = this->layout->getHeight();
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
-            if (this->layout->isLocationConflictTile(x, y))
+            if (this->layout->isLocationConflictTile(x, y, connections))
                 painter.drawImage(x * Metatile::pixelWidth(), y * Metatile::pixelHeight(), errorTile);
         }
     }

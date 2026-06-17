@@ -1699,6 +1699,7 @@ void Editor::displayMapMetatiles() {
     clearMapMetatiles();
 
     map_item = new LayoutPixmapItem(this->layout, this->metatile_selector_item, this->settings);
+    map_item->map = this->map;
     connect(map_item, &LayoutPixmapItem::mouseEvent, this, &Editor::mouseEvent_map);
     connect(map_item, &LayoutPixmapItem::startPaint, this, &Editor::onMapStartPaint);
     connect(map_item, &LayoutPixmapItem::endPaint, this, &Editor::onMapEndPaint);

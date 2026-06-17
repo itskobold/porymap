@@ -6,6 +6,7 @@
 #include <QGraphicsPixmapItem>
 
 class Layout;
+class Map;
 
 class LayoutPixmapItem : public QObject, public QGraphicsPixmapItem {
     Q_OBJECT
@@ -26,6 +27,10 @@ public:
     ~LayoutPixmapItem();
 
     Layout *layout;
+
+    // The map currently being displayed through this layout, if any. Used so the location-error
+    // overlay can extend its scan across the map's connections; null when editing a bare layout.
+    Map *map = nullptr;
 
     MetatileSelector *metatileSelector;
 

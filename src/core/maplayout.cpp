@@ -164,27 +164,65 @@ bool Layout::metatileIsSecondary(uint16_t metatileId) {
     return metatileId >= Project::getNumMetatilesPrimary();
 }
 
-bool Layout::isLocationConflictTile(int x, int y) const {
-    Block block;
-    if (!getBlock(x, y, &block) || !metatileIsSecondary(block.metatileId()))
-        return false;
-    const uint16_t location = block.location();
-    Block other;
-    for (int d = -LocationConflictRangeH; d <= LocationConflictRangeH; d++) {
-        if (d == 0) continue;
-        if (getBlock(x + d, y, &other) && other.location() != location) return true;
-    }
-    for (int d = -LocationConflictRangeV; d <= LocationConflictRangeV; d++) {
-        if (d == 0) continue;
-        if (getBlock(x, y + d, &other) && other.location() != location) return true;
+// Resolve the block at (x, y) when it lies outside the layout these coordinates belong to, by
+// crossing one of the given map connections into the adjacent map. (x, y) are in the parent
+// layout's tile space (origin at its top-left), matching MapConnection::relativePixelPos().
+// Diving connections (dive/emerge) are ignored, since they don't share a region border.
+// On success, returns true and sets *outBlock / *outLayout to the connected tile and its layout.
+static bool getConnectedBlock(int x, int y, const QList<MapConnection*> &connections, Block *outBlock, Layout **outLayout) {
+    for (auto connection : connections) {
+        if (!connection || connection->isDiving())
+            continue;
+        Map *targetMap = connection->targetMap();
+        Layout *targetLayout = targetMap ? targetMap->layout() : nullptr;
+        if (!targetLayout)
+            continue;
+        // relativePixelPos() is the target map's top-left relative to the parent's top-left,
+        // so the parent-space tile (x, y) maps to (x - relX, y - relY) within the target.
+        const QPoint relPos = connection->relativePixelPos();
+        const int tx = x - (relPos.x() / Metatile::pixelWidth());
+        const int ty = y - (relPos.y() / Metatile::pixelHeight());
+        if (targetLayout->getBlock(tx, ty, outBlock)) {
+            if (outLayout) *outLayout = targetLayout;
+            return true;
+        }
     }
     return false;
 }
 
-bool Layout::hasLocationConflicts() const {
+bool Layout::isLocationConflictTile(int x, int y, const QList<MapConnection*> &connections) const {
+    Block block;
+    if (!getBlock(x, y, &block) || !metatileIsSecondary(block.metatileId()))
+        return false;
+    const uint16_t location = block.location();
+    Tileset * const tileset = secondaryTilesetForLocation(location);
+
+    auto conflictsAt = [&](int nx, int ny) -> bool {
+        Block other;
+        if (getBlock(nx, ny, &other))
+            return other.location() != location;
+        // Off the edge of this layout: follow a map connection into the adjacent map. Its
+        // location IDs are independent of ours, so compare the secondary tileset each resolves
+        // to instead - a different tileset there is what renders incorrectly across the border.
+        Layout *otherLayout = nullptr;
+        if (getConnectedBlock(nx, ny, connections, &other, &otherLayout))
+            return otherLayout->secondaryTilesetForLocation(other.location()) != tileset;
+        return false;
+    };
+
+    for (int d = -LocationConflictRangeH; d <= LocationConflictRangeH; d++) {
+        if (d != 0 && conflictsAt(x + d, y)) return true;
+    }
+    for (int d = -LocationConflictRangeV; d <= LocationConflictRangeV; d++) {
+        if (d != 0 && conflictsAt(x, y + d)) return true;
+    }
+    return false;
+}
+
+bool Layout::hasLocationConflicts(const QList<MapConnection*> &connections) const {
     for (int y = 0; y < this->height; y++)
         for (int x = 0; x < this->width; x++)
-            if (isLocationConflictTile(x, y))
+            if (isLocationConflictTile(x, y, connections))
                 return true;
     return false;
 }

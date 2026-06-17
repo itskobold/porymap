@@ -2059,12 +2059,14 @@ bool MainWindow::save(bool currentOnly) {
         // the wrong tileset near a region border in-game.
         QStringList conflicted;
         if (currentOnly) {
-            if (this->editor->layout && this->editor->layout->hasLocationConflicts())
+            const QList<MapConnection*> connections = this->editor->map ? this->editor->map->getConnections()
+                                                                        : QList<MapConnection*>();
+            if (this->editor->layout && this->editor->layout->hasLocationConflicts(connections))
                 conflicted << (this->editor->map ? this->editor->map->name() : this->editor->layout->name);
         } else {
             for (const QString &mapName : this->editor->project->mapNames()) {
                 Map *map = this->editor->project->getMap(mapName);
-                if (map && map->layout() && map->layout()->hasLocationConflicts())
+                if (map && map->layout() && map->layout()->hasLocationConflicts(map->getConnections()))
                     conflicted << map->name();
             }
             conflicted.sort();

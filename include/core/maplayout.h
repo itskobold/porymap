@@ -5,11 +5,13 @@
 #include "blockdata.h"
 #include "tileset.h"
 #include <QImage>
+#include <QList>
 #include <QPixmap>
 #include <QString>
 #include <QUndoStack>
 
 class Map;
+class MapConnection;
 class LayoutPixmapItem;
 class CollisionPixmapItem;
 class LocationPixmapItem;
@@ -208,12 +210,14 @@ public:
     // A secondary-tileset tile this close to a tile of a different location renders with
     // the wrong tileset near a region border in-game. The in-game view is wider than it is
     // tall, so the conflict range is larger horizontally than vertically.
-    static constexpr int LocationConflictRangeH = 7;
-    static constexpr int LocationConflictRangeV = 5;
+    static constexpr int LocationConflictRangeH = 8;
+    static constexpr int LocationConflictRangeV = 6;
     // True if the tile at (x, y) is such a conflict. Used by the editor's error overlay.
-    bool isLocationConflictTile(int x, int y) const;
+    // The scan also reaches across the given map connections (diving connections are
+    // ignored), comparing the secondary tileset the neighbouring map's location resolves to.
+    bool isLocationConflictTile(int x, int y, const QList<MapConnection*> &connections = {}) const;
     // True if the layout contains any conflict tile. Used to block saving until resolved.
-    bool hasLocationConflicts() const;
+    bool hasLocationConflicts(const QList<MapConnection*> &connections = {}) const;
 
 private:
     void setNewDimensionsBlockdata(int newWidth, int newHeight);
