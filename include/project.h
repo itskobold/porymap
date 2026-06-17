@@ -179,6 +179,8 @@ public:
     bool saveLayout(Layout *layout);
     bool saveMap(Map *map, bool skipLayout = false);
     bool saveTextFile(const QString &path, const QString &text);
+    // True if any tile in the map's layout has a location value >= the map's Num. Locations.
+    bool hasOutOfBoundsLocations(const Map *map) const;
     bool saveRegionMapSections();
     bool saveTilesets(Tileset*, Tileset*);
     bool saveTilesetMetatileLabels(Tileset*, Tileset*);

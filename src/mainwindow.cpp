@@ -1228,6 +1228,9 @@ void MainWindow::setLayoutOnlyMode(bool layoutOnly) {
 
     ui->comboBox_LayoutSelector->setEnabled(mapEditingEnabled);
     ui->actionDuplicate_Current_Map->setEnabled(mapEditingEnabled);
+
+    // Num. Locations is a map header field, so it's only meaningful when a map is open.
+    ui->spinBox_SelectedNumLocations->setEnabled(mapEditingEnabled);
 }
 
 // setLayout, but with a visible error message in case of failure.
@@ -1392,6 +1395,17 @@ void MainWindow::openEventMap(Event *sourceEvent) {
 
 void MainWindow::displayMapProperties() {
     this->mapHeaderForm->clear();
+
+    // The Num. Locations control (Locations tab) edits the current map's header.
+    bool hasMap = editor && editor->map && editor->project;
+    ui->spinBox_SelectedNumLocations->setEnabled(hasMap);
+    if (hasMap) {
+        const QSignalBlocker b(ui->spinBox_SelectedNumLocations);
+        ui->spinBox_SelectedNumLocations->setValue(editor->map->header()->numLocations());
+    }
+    // Refresh which location tiles are flagged out-of-bounds for this map.
+    editor->updateLocationLimit();
+
     if (!editor || !editor->map || !editor->project) {
         ui->frame_HeaderData->setEnabled(false);
         return;
@@ -2007,6 +2021,31 @@ void MainWindow::on_action_Save_triggered() {
 }
 
 bool MainWindow::save(bool currentOnly) {
+    // Safety: refuse to save maps that have location data exceeding their Num. Locations setting.
+    if (this->editor && this->editor->project) {
+        QStringList offending;
+        if (currentOnly) {
+            if (this->editor->map && this->editor->project->hasOutOfBoundsLocations(this->editor->map))
+                offending << this->editor->map->name();
+        } else {
+            for (const QString &mapName : this->editor->project->mapNames()) {
+                Map *map = this->editor->project->getMap(mapName);
+                if (map && this->editor->project->hasOutOfBoundsLocations(map))
+                    offending << map->name();
+            }
+            offending.sort();
+        }
+        if (!offending.isEmpty()) {
+            WarningMessage::show(QStringLiteral("Cannot save: out-of-bounds location data"),
+                QString("These maps have tiles whose location value is at or above their "
+                        "\"Num. Locations\" setting:\n\n%1\n\nLower those tiles' location values "
+                        "(drawn with the out-of-bounds graphics) or raise Num. Locations, then save again.")
+                    .arg(offending.join("\n")),
+                this);
+            return false;
+        }
+    }
+
     bool success = currentOnly ? this->editor->saveCurrent() : this->editor->saveAll();
     if (!success) {
         RecentErrorMessage::show(QStringLiteral("Failed to save some project changes."), this);
@@ -3226,6 +3265,15 @@ void MainWindow::on_spinBox_SelectedElevation_valueChanged(int elevation) {
 void MainWindow::on_spinBox_SelectedLocation_valueChanged(int location) {
     if (this->editor && this->editor->location_selector_item)
         this->editor->location_selector_item->select(0, location);
+}
+
+void MainWindow::on_spinBox_SelectedNumLocations_valueChanged(int numLocations) {
+    // Num. Locations is a per-map header field, not part of the (possibly shared) layout.
+    if (this->editor && this->editor->map) {
+        this->editor->map->header()->setNumLocations(numLocations);
+        // Re-flag out-of-bounds location tiles against the new limit.
+        this->editor->updateLocationLimit();
+    }
 }
 
 void MainWindow::on_actionRegion_Map_Editor_triggered() {

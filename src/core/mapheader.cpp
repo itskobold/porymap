@@ -11,6 +11,7 @@ MapHeader::MapHeader(const MapHeader& other) : MapHeader() {
     m_allowsBiking = other.m_allowsBiking;
     m_allowsEscaping = other.m_allowsEscaping;
     m_floorNumber = other.m_floorNumber;
+    m_numLocations = other.m_numLocations;
     m_battleScene = other.m_battleScene;
 }
 
@@ -28,6 +29,7 @@ MapHeader &MapHeader::operator=(const MapHeader &other) {
     setAllowsBiking(other.m_allowsBiking);
     setAllowsEscaping(other.m_allowsEscaping);
     setFloorNumber(other.m_floorNumber);
+    setNumLocations(other.m_numLocations);
     setBattleScene(other.m_battleScene);
     return *this;
 }
@@ -109,6 +111,14 @@ void MapHeader::setFloorNumber(int floorNumber) {
         return;
     m_floorNumber = floorNumber;
     emit floorNumberChanged(m_floorNumber);
+    emit modified();
+}
+
+void MapHeader::setNumLocations(int numLocations) {
+    if (m_numLocations == numLocations)
+        return;
+    m_numLocations = numLocations;
+    emit numLocationsChanged(m_numLocations);
     emit modified();
 }
 

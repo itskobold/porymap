@@ -97,6 +97,11 @@ public:
     LocationPixmapItem *locationItem = nullptr;
     BorderMetatilesPixmapItem *borderItem = nullptr;
 
+    // Tiles whose location value is >= this limit are drawn as "out of bounds" and
+    // block saving. Set from the current map's Num. Locations; defaults to allowing
+    // everything (relevant in layout-only mode, where there's no map header).
+    int locationLimit = 0xFFFF;
+
     QUndoStack editHistory;
 
     // to simplify new layout settings transfer between functions

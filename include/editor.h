@@ -184,6 +184,7 @@ public:
     qreal locationOpacity = 0.5;
     static QList<QList<const QImage*>> collisionIcons;
     static QList<const QImage*> locationIcons;
+    static QList<const QImage*> locationOobIcons;
 
     int eventShiftActionId = 0;
     int eventMoveActionId = 0;
@@ -196,6 +197,7 @@ public:
     void openLayoutJson(const QString &layoutId) const;
     void setCollisionGraphics();
     void setLocationGraphics();
+    void updateLocationLimit();
 
     enum ZValue {
         MapBorder = -4,
@@ -229,6 +231,7 @@ private:
     QPixmap collisionSheetPixmap;
 
     const QImage defaultLocationImgSheet = QImage(":/images/locations.png");
+    const QImage defaultLocationOobImgSheet = QImage(":/images/locations_oob.png");
     QPixmap locationSheetPixmap;
 
     EditMode editMode = EditMode::None;

@@ -21,6 +21,15 @@ QImage getLocationMetatileImage(int location) {
     return image ? *image : QImage();
 }
 
+QImage getLocationOobMetatileImage(Block block) {
+    return getLocationOobMetatileImage(block.location());
+}
+
+QImage getLocationOobMetatileImage(int location) {
+    const QImage * image = Editor::locationOobIcons.value(location);
+    return image ? *image : QImage();
+}
+
 QImage getMetatileImage(uint16_t metatileId, const Layout *layout, bool useTruePalettes) {
     Metatile* metatile = Tileset::getMetatile(metatileId,
                                               layout ? layout->tileset_primary : nullptr,

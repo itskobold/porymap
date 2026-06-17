@@ -524,7 +524,11 @@ QPixmap Layout::renderLocation(bool ignoreCache) {
         }
         changed_any = true;
         Block block = this->blockdata.at(i);
-        QImage location_metatile_image = getLocationMetatileImage(block);
+        // Tiles at or above the map's location limit are out of bounds; draw them with the
+        // distinct OOB graphics so the user can see what's blocking the save.
+        QImage location_metatile_image = (block.location() >= this->locationLimit)
+                                       ? getLocationOobMetatileImage(block)
+                                       : getLocationMetatileImage(block);
         int x = this->width ? ((i % this->width) * Metatile::pixelWidth()) : 0;
         int y = this->width ? ((i / this->width) * Metatile::pixelHeight()) : 0;
         painter.drawImage(x, y, location_metatile_image);

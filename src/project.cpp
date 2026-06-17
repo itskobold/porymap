@@ -360,6 +360,7 @@ QSet<QString> Project::getTopLevelMapFields() const {
         "map_type",
         "show_map_name",
         "battle_scene",
+        "num_locations",
         "connections",
         Event::groupToJsonKey(Event::Group::Object),
         Event::groupToJsonKey(Event::Group::Warp),
@@ -446,6 +447,9 @@ bool Project::loadMapData(Map* map) {
     map->header()->setType(ParseUtil::jsonToQString(mapObj.take("map_type")));
     map->header()->setShowsLocationName(ParseUtil::jsonToBool(mapObj.take("show_map_name")));
     map->header()->setBattleScene(ParseUtil::jsonToQString(mapObj.take("battle_scene")));
+    // Number of per-tile location values used by this map (1-4). Absent in older maps; default to 1.
+    if (mapObj.contains("num_locations"))
+        map->header()->setNumLocations(ParseUtil::jsonToInt(mapObj.take("num_locations")));
 
     if (projectConfig.mapAllowFlagsEnabled) {
         map->header()->setAllowsBiking(ParseUtil::jsonToBool(mapObj.take("allow_cycling")));
@@ -1392,6 +1396,7 @@ bool Project::saveMap(Map *map, bool skipLayout) {
         mapObj["floor_number"] = map->header()->floorNumber();
     }
     mapObj["battle_scene"] = map->header()->battleScene();
+    mapObj["num_locations"] = map->header()->numLocations();
 
     // Connections
     const auto connections = map->getConnections();
@@ -1458,6 +1463,18 @@ bool Project::saveMap(Map *map, bool skipLayout) {
     if (!skipLayout && !saveLayout(map->layout()))
         return false;
     return true;
+}
+
+bool Project::hasOutOfBoundsLocations(const Map *map) const {
+    if (!map || !map->layout())
+        return false;
+    // Valid location values are 0 .. numLocations-1.
+    const int limit = map->header()->numLocations();
+    for (const Block &block : map->layout()->blockdata) {
+        if (block.location() >= limit)
+            return true;
+    }
+    return false;
 }
 
 bool Project::saveLayout(Layout *layout) {

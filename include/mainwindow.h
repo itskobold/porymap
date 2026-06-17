@@ -295,6 +295,7 @@ private slots:
     void on_spinBox_SelectedElevation_valueChanged(int elevation);
     void on_spinBox_SelectedCollision_valueChanged(int collision);
     void on_spinBox_SelectedLocation_valueChanged(int location);
+    void on_spinBox_SelectedNumLocations_valueChanged(int numLocations);
     void on_horizontalSlider_LocationTransparency_valueChanged(int value);
     void on_horizontalSlider_LocationZoom_valueChanged(int value);
     void on_actionRegion_Map_Editor_triggered();

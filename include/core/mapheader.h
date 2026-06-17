@@ -24,6 +24,7 @@ public:
         && m_allowsBiking == other.m_allowsBiking
         && m_allowsEscaping == other.m_allowsEscaping
         && m_floorNumber == other.m_floorNumber
+        && m_numLocations == other.m_numLocations
         && m_battleScene == other.m_battleScene;
     }
     bool operator!=(const MapHeader& other) const {
@@ -42,6 +43,7 @@ public:
     void setAllowsBiking(bool allowsBiking);
     void setAllowsEscaping(bool allowsEscaping);
     void setFloorNumber(int floorNumber);
+    void setNumLocations(int numLocations);
     void setBattleScene(const QString &battleScene);
 
     QString song() const { return m_song; }
@@ -56,6 +58,7 @@ public:
     bool allowsBiking() const { return m_allowsBiking; }
     bool allowsEscaping() const { return m_allowsEscaping; }
     int floorNumber() const { return m_floorNumber; }
+    int numLocations() const { return m_numLocations; }
     QString battleScene() const { return m_battleScene; }
 
 signals:
@@ -71,6 +74,7 @@ signals:
     void allowsBikingChanged(bool);
     void allowsEscapingChanged(bool);
     void floorNumberChanged(int);
+    void numLocationsChanged(int);
     void battleSceneChanged(QString);
     void modified();
 
@@ -87,6 +91,9 @@ private:
     bool m_allowsBiking = false;
     bool m_allowsEscaping = false;
     int m_floorNumber = 0;
+    // Number of distinct per-tile location values used by this map (1-4). Stored in the
+    // map header as numLocations-1; the binary -1 conversion happens in the mapjson tool.
+    int m_numLocations = 1;
     QString m_battleScene;
 };
 

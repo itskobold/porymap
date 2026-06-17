@@ -29,6 +29,10 @@ QList<QList<const QImage*>> Editor::collisionIcons;
 // Array mapping location values to an icon.
 QList<const QImage*> Editor::locationIcons;
 
+// Array mapping location values to an "out of bounds" icon (drawn when a tile's location
+// exceeds the current map's Num. Locations).
+QList<const QImage*> Editor::locationOobIcons;
+
 Editor::Editor(Ui::MainWindow* ui)
 {
     this->ui = ui;
@@ -80,6 +84,7 @@ Editor::~Editor()
     for (auto sublist : collisionIcons)
         qDeleteAll(sublist);
     qDeleteAll(locationIcons);
+    qDeleteAll(locationOobIcons);
 
     closeProject();
 }
@@ -2503,16 +2508,32 @@ void Editor::setLocationGraphics() {
 
     qDeleteAll(locationIcons);
     locationIcons.clear();
+    qDeleteAll(locationOobIcons);
+    locationOobIcons.clear();
 
-    // Use the image sheet to create an icon for each location value.
+    // Use the image sheets to create an icon for each location value (normal and out-of-bounds).
     const int w = Metatile::pixelWidth(), h = Metatile::pixelHeight();
     imgSheet = imgSheet.scaled(w * imgColumns, h * imgRows);
+    QImage oobSheet = this->defaultLocationOobImgSheet.scaled(w * imgColumns, h * imgRows);
     for (int location = 0; location <= Block::getMaxLocation(); location++) {
         // If (location >= imgRows) here, it's a valid location value with no icon on the
         // image sheet; fall back to the last available icon.
         int y = ((location < imgRows) ? location : (imgRows - 1)) * h;
         locationIcons.append(new QImage(imgSheet.copy(0, y, w, h)));
+        locationOobIcons.append(new QImage(oobSheet.copy(0, y, w, h)));
     }
+}
+
+// Updates the current layout's location limit from the active map's Num. Locations and
+// redraws the location overlay so out-of-bounds tiles are flagged. With no map open
+// (layout-only mode) every value is allowed.
+void Editor::updateLocationLimit() {
+    if (!this->layout)
+        return;
+    this->layout->locationLimit = this->map ? this->map->header()->numLocations()
+                                            : (Block::getMaxLocation() + 1);
+    if (this->location_item)
+        this->location_item->draw(true);
 }
 
 // Custom collision graphics may be provided by the user.
