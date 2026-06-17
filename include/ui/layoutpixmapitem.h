@@ -23,6 +23,7 @@ public:
         this->prevStraightPathState = false;
         setAcceptHoverEvents(true);
     }
+    ~LayoutPixmapItem();
 
     Layout *layout;
 
@@ -83,6 +84,10 @@ public:
     void shift(int xDelta, int yDelta, bool fromScriptCall = false);
     virtual void draw(bool ignoreCache = false);
 
+    // Overlay drawn above all other map graphics (in every view) that marks secondary-tileset
+    // tiles lying too close to a tile of a different location, i.e. near another region's border.
+    void drawLocationErrors();
+
     void updateMetatileSelection(QGraphicsSceneMouseEvent *event);
     void paintNormal(int x, int y, bool fromScriptCall = false);
     void lockNondominantAxis(QGraphicsSceneMouseEvent *event);
@@ -99,6 +104,10 @@ private:
     static constexpr int smartPathHeight = 3;
     static constexpr int smartPathMiddleIndex = (smartPathWidth / 2) + ((smartPathHeight / 2) * smartPathWidth);
     QPoint lastMetatileSelectionPos = QPoint(-1,-1);
+
+    // Top-level scene overlay item for the location-error markers (kept above all other
+    // graphics via a high Z-value). Owned by this item; removed from the scene on destruction.
+    QGraphicsPixmapItem *m_locationErrorItem = nullptr;
 
 signals:
     void startPaint(QGraphicsSceneMouseEvent *, LayoutPixmapItem *);

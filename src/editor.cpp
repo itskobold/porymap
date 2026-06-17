@@ -1342,6 +1342,22 @@ bool Editor::setMap(QString map_name) {
 
     setLayout(map->layoutId());
 
+    // The secondary tileset is stored per-location in the map header now, not in the
+    // (possibly shared) layout. Apply the default location's secondary tileset before
+    // rendering so the map is drawn with the correct tiles.
+    const QString headerTileset = this->map->header()->secondaryTileset(0);
+    if (!headerTileset.isEmpty() && this->project->secondaryTilesetLabels.contains(headerTileset)) {
+        updateSecondaryTileset(headerTileset, true);
+        const QSignalBlocker b(ui->comboBox_SecondaryTileset);
+        ui->comboBox_SecondaryTileset->setTextItem(this->layout->tileset_secondary_label);
+    }
+
+    // Load every location's secondary tileset so tiles render with the tileset of their
+    // location, then re-render: setLayout() above drew the map before these were applied.
+    updateLocationTilesets();
+    if (this->map_item)
+        this->map_item->draw(true);
+
     editGroup.addStack(map->editHistory());
     editGroup.setActiveStack(map->editHistory());
 
@@ -1691,8 +1707,10 @@ void Editor::displayMapMetatiles() {
     connect(map_item, &LayoutPixmapItem::hoverChanged, this, &Editor::onMapHoverChanged);
     connect(map_item, &LayoutPixmapItem::hoverCleared, this, &Editor::onMapHoverCleared);
 
-    map_item->draw(true);
+    // Add to the scene before drawing so the (top-level) location-error overlay created
+    // during draw() can attach itself to the same scene.
     scene->addItem(map_item);
+    map_item->draw(true);
 
     // Scene rect is the map plus a margin that gives enough space to scroll and see the edge of the player view rectangle.
     scene->setSceneRect(this->layout->getVisibleRect() + QMargins(3,3,3,3));
@@ -2073,6 +2091,27 @@ void Editor::updateSecondaryTileset(QString tilesetLabel, bool forceLoad)
         this->layout->tileset_secondary_label = tilesetLabel;
         this->layout->tileset_secondary = project->getTileset(tilesetLabel, forceLoad);
         layout->clearBorderCache();
+    }
+}
+
+void Editor::updateLocationTilesets()
+{
+    if (!this->layout)
+        return;
+
+    // Layout-only mode (no map header): leave the list empty so rendering falls back to
+    // the layout's single secondary tileset for every tile.
+    this->layout->location_tilesets.clear();
+    if (!this->map || !this->project)
+        return;
+
+    const MapHeader *header = this->map->header();
+    for (int i = 0; i < MAX_MAP_LOCATIONS; i++) {
+        const QString label = header->secondaryTileset(i);
+        Tileset *tileset = (!label.isEmpty() && this->project->secondaryTilesetLabels.contains(label))
+                         ? this->project->getTileset(label)
+                         : nullptr;
+        this->layout->location_tilesets.append(tileset);
     }
 }
 

@@ -2,10 +2,24 @@
 #include "metatile.h"
 #include "log.h"
 #include "scripting.h"
+#include "editor.h"
 
 #include "editcommands.h"
 
+#include <QGraphicsScene>
+#include <QPainter>
+
 #define SWAP(a, b) do { if (a != b) { a ^= b; b ^= a; a ^= b; } } while (0)
+
+// Stamp a metatile onto a block. For secondary-tileset tiles, also record the paint
+// location so the tile renders with (and in-game uses) that location's secondary tileset.
+// paintLocation is -1 when the tile's location should be left unchanged (e.g. when
+// painting primary-tileset tiles, whose location stays freely editable).
+static void setBlockMetatile(Block *block, uint16_t metatileId, int paintLocation) {
+    block->setMetatileId(metatileId);
+    if (paintLocation >= 0 && Layout::metatileIsSecondary(metatileId))
+        block->setLocation(static_cast<uint16_t>(paintLocation));
+}
 
 void LayoutPixmapItem::paint(QGraphicsSceneMouseEvent *event) {
     if (layout) {
@@ -103,6 +117,7 @@ void LayoutPixmapItem::shift(int xDelta, int yDelta, bool fromScriptCall) {
 
 void LayoutPixmapItem::paintNormal(int x, int y, bool fromScriptCall) {
     MetatileSelection selection = this->metatileSelector->getMetatileSelection();
+    int paintLocation = fromScriptCall ? -1 : this->metatileSelector->paintLocation();
     int initialX = fromScriptCall ? x : this->paint_tile_initial_x;
     int initialY = fromScriptCall ? y : this->paint_tile_initial_y;
 
@@ -129,7 +144,7 @@ void LayoutPixmapItem::paintNormal(int x, int y, bool fromScriptCall) {
             MetatileSelectionItem item = selection.metatileItems.value(index);
             if (!item.enabled)
                 continue;
-            block.setMetatileId(item.metatileId);
+            setBlockMetatile(&block, item.metatileId, paintLocation);
             if (selection.hasCollision && selection.collisionItems.length() == selection.metatileItems.length()) {
                 CollisionSelectionItem collisionItem = selection.collisionItems.value(index);
                 block.setCollision(collisionItem.collision);
@@ -196,6 +211,7 @@ void LayoutPixmapItem::paintSmartPath(int x, int y, bool fromScriptCall) {
     MetatileSelection selection = this->metatileSelector->getMetatileSelection();
     if (!isValidSmartPathSelection(selection))
         return;
+    int paintLocation = fromScriptCall ? -1 : this->metatileSelector->paintLocation();
 
     // Shift to the middle tile of the smart path selection.
     uint16_t openMetatileId = selection.metatileItems.at(smartPathMiddleIndex).metatileId;
@@ -220,7 +236,7 @@ void LayoutPixmapItem::paintSmartPath(int x, int y, bool fromScriptCall) {
         int actualY = j + y;
         Block block;
         if (this->layout->getBlock(actualX, actualY, &block)) {
-            block.setMetatileId(openMetatileId);
+            setBlockMetatile(&block, openMetatileId, paintLocation);
             if (setCollisions) {
                 block.setCollision(openCollision);
                 block.setElevation(openElevation);
@@ -263,7 +279,7 @@ void LayoutPixmapItem::paintSmartPath(int x, int y, bool fromScriptCall) {
         if (this->layout->getBlock(actualX - 1, actualY, &left) && isSmartPathTile(selection.metatileItems, left.metatileId()))
             id += 8;
 
-        block.setMetatileId(selection.metatileItems.at(smartPathTable[id]).metatileId);
+        setBlockMetatile(&block, selection.metatileItems.at(smartPathTable[id]).metatileId, paintLocation);
         if (setCollisions) {
             CollisionSelectionItem collisionItem = selection.collisionItems.at(smartPathTable[id]);
             block.setCollision(collisionItem.collision);
@@ -426,6 +442,7 @@ void LayoutPixmapItem::magicFill(
 
         Blockdata oldMetatiles = !fromScriptCall ? this->layout->blockdata : Blockdata();
 
+        int paintLocation = fromScriptCall ? -1 : this->metatileSelector->paintLocation();
         bool setCollisions = selectedCollisions.length() == selectedMetatiles.length();
         uint16_t metatileId = block.metatileId();
         for (int y = 0; y < this->layout->getHeight(); y++) {
@@ -439,7 +456,7 @@ void LayoutPixmapItem::magicFill(
                     if (j < 0) j = selectionDimensions.height() + j;
                     int index = j * selectionDimensions.width() + i;
                     if (index < selectedMetatiles.length() && selectedMetatiles.at(index).enabled) {
-                        block.setMetatileId(selectedMetatiles.at(index).metatileId);
+                        setBlockMetatile(&block, selectedMetatiles.at(index).metatileId, paintLocation);
                         if (setCollisions) {
                             CollisionSelectionItem item = selectedCollisions.at(index);
                             block.setCollision(item.collision);
@@ -476,6 +493,7 @@ void LayoutPixmapItem::floodFill(
         const QList<CollisionSelectionItem> &selectedCollisions,
         bool fromScriptCall) {
     bool setCollisions = selectedCollisions.length() == selectedMetatiles.length();
+    int paintLocation = fromScriptCall ? -1 : this->metatileSelector->paintLocation();
     Blockdata oldMetatiles = !fromScriptCall ? this->layout->blockdata : Blockdata();
 
     QSet<int> visited;
@@ -501,7 +519,7 @@ void LayoutPixmapItem::floodFill(
         uint16_t metatileId = selectedMetatiles.value(index).metatileId;
         uint16_t old_metatileId = block.metatileId();
         if (selectedMetatiles.value(index).enabled && (selectedMetatiles.count() != 1 || old_metatileId != metatileId)) {
-            block.setMetatileId(metatileId);
+            setBlockMetatile(&block, metatileId, paintLocation);
             if (setCollisions) {
                 CollisionSelectionItem item = selectedCollisions.value(index);
                 block.setCollision(item.collision);
@@ -536,6 +554,7 @@ void LayoutPixmapItem::floodFillSmartPath(int initialX, int initialY, bool fromS
     MetatileSelection selection = this->metatileSelector->getMetatileSelection();
     if (!isValidSmartPathSelection(selection))
         return;
+    int paintLocation = fromScriptCall ? -1 : this->metatileSelector->paintLocation();
 
     // Shift to the middle tile of the smart path selection.
     uint16_t openMetatileId = selection.metatileItems.at(smartPathMiddleIndex).metatileId;
@@ -568,7 +587,7 @@ void LayoutPixmapItem::floodFillSmartPath(int initialX, int initialY, bool fromS
             continue;
         }
 
-        block.setMetatileId(openMetatileId);
+        setBlockMetatile(&block, openMetatileId, paintLocation);
         if (setCollisions) {
             block.setCollision(openCollision);
             block.setElevation(openElevation);
@@ -618,7 +637,7 @@ void LayoutPixmapItem::floodFillSmartPath(int initialX, int initialY, bool fromS
         if (this->layout->getBlock(x - 1, y, &left) && isSmartPathTile(selection.metatileItems, left.metatileId()))
             id += 8;
 
-        block.setMetatileId(selection.metatileItems.at(smartPathTable[id]).metatileId);
+        setBlockMetatile(&block, selection.metatileItems.at(smartPathTable[id]).metatileId, paintLocation);
         if (setCollisions) {
             CollisionSelectionItem item = selection.collisionItems.at(smartPathTable[id]);
             block.setCollision(item.collision);
@@ -687,11 +706,58 @@ void LayoutPixmapItem::select(QGraphicsSceneMouseEvent *event) {
     }
 }
 
+LayoutPixmapItem::~LayoutPixmapItem() {
+    // The error overlay is a top-level scene item (not a child), so clean it up explicitly.
+    if (this->m_locationErrorItem) {
+        if (this->m_locationErrorItem->scene())
+            this->m_locationErrorItem->scene()->removeItem(this->m_locationErrorItem);
+        delete this->m_locationErrorItem;
+    }
+}
+
 void LayoutPixmapItem::draw(bool ignoreCache) {
     if (this->layout) {
         layout->setLayoutItem(this);
         setPixmap(this->layout->render(ignoreCache));
+        // The error overlay depends on the blockdata we just rendered; refresh it so it
+        // tracks edits. It's shown in every view, so it's always kept up to date.
+        drawLocationErrors();
     }
+}
+
+void LayoutPixmapItem::drawLocationErrors() {
+    if (!this->layout)
+        return;
+
+    // The marker drawn over each offending tile (one metatile in size). Loaded once.
+    static const QImage errorTile(":/images/location_tileset_error.png");
+
+    if (!this->m_locationErrorItem) {
+        // A top-level item (not a child of the map) so it can be stacked above every other
+        // map graphic, in any view, via the highest map Z-value.
+        this->m_locationErrorItem = new QGraphicsPixmapItem();
+        this->m_locationErrorItem->setZValue(Editor::ZValue::LocationError);
+    }
+    // The map item and overlay share the scene and origin; keep them added/aligned together.
+    this->m_locationErrorItem->setPos(this->pos());
+    if (this->scene() && this->m_locationErrorItem->scene() != this->scene())
+        this->scene()->addItem(this->m_locationErrorItem);
+
+    QImage overlay(this->layout->pixelWidth(), this->layout->pixelHeight(), QImage::Format_RGBA8888);
+    overlay.fill(Qt::transparent);
+
+    QPainter painter(&overlay);
+    const int w = this->layout->getWidth();
+    const int h = this->layout->getHeight();
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            if (this->layout->isLocationConflictTile(x, y))
+                painter.drawImage(x * Metatile::pixelWidth(), y * Metatile::pixelHeight(), errorTile);
+        }
+    }
+    painter.end();
+
+    this->m_locationErrorItem->setPixmap(QPixmap::fromImage(overlay));
 }
 
 void LayoutPixmapItem::hoverMoveEvent(QGraphicsSceneHoverEvent *event) {

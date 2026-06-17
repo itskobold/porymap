@@ -28,7 +28,9 @@ void LocationPixmapItem::paint(QGraphicsSceneMouseEvent *event) {
         }
 
         Block block;
-        if (this->layout->getBlock(pos.x(), pos.y(), &block)) {
+        // A secondary-tileset tile's location is fixed by the tileset it was painted from,
+        // so the Locations editor can't overwrite it.
+        if (this->layout->getBlock(pos.x(), pos.y(), &block) && !Layout::metatileIsSecondary(block.metatileId())) {
             block.setLocation(this->selectedLocation->value());
             this->layout->setBlock(pos.x(), pos.y(), block, true);
         }

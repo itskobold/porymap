@@ -16,7 +16,46 @@ int MetatileSelector::numPrimaryMetatilesRounded() const {
 }
 
 void MetatileSelector::updateBasePixmap() {
-    this->basePixmap = QPixmap::fromImage(getMetatileSheetImage(this->layout, this->numMetatilesWide));
+    if (this->m_section == DisplaySection::All || !this->layout) {
+        this->basePixmap = QPixmap::fromImage(getMetatileSheetImage(this->layout, this->numMetatilesWide));
+        return;
+    }
+
+    const Tileset *primary = primaryTileset();
+    const Tileset *secondaryForDraw = displaySecondaryTileset();
+    uint16_t start, end;
+    if (this->m_section == DisplaySection::Primary) {
+        if (!primary || primary->numMetatiles() == 0) { this->basePixmap = QPixmap(); return; }
+        start = 0;
+        end = primary->numMetatiles() - 1;
+    } else { // Secondary
+        if (!secondaryForDraw || secondaryForDraw->numMetatiles() == 0) { this->basePixmap = QPixmap(); return; }
+        start = Project::getNumMetatilesPrimary();
+        end = start + secondaryForDraw->numMetatiles() - 1;
+    }
+
+    this->basePixmap = QPixmap::fromImage(getMetatileSheetImage(
+        primary, secondaryForDraw, start, end, this->numMetatilesWide,
+        this->layout->metatileLayerOrder(), this->layout->metatileLayerOpacity(),
+        Metatile::pixelSize(), false));
+}
+
+void MetatileSelector::setDisplaySection(DisplaySection section, Tileset *secondaryOverride, int locationIndex) {
+    this->m_section = section;
+    this->m_secondaryOverride = secondaryOverride;
+    this->m_secondaryLocation = locationIndex;
+    updateBasePixmap();
+
+    // If the single-metatile selection isn't visible in this section, move it to the
+    // section's first metatile so the highlighted cell stays valid. An external/prefab
+    // selection is left alone (it isn't tied to a single visible cell).
+    if (!this->externalSelection && !this->prefabSelection && this->selection.metatileItems.length() == 1) {
+        bool ok = false;
+        metatileIdToPos(this->selection.metatileItems.first().metatileId, &ok);
+        if (!ok)
+            select(section == DisplaySection::Secondary ? Project::getNumMetatilesPrimary() : 0);
+    }
+    draw();
 }
 
 void MetatileSelector::draw() {
@@ -201,8 +240,29 @@ uint16_t MetatileSelector::posToMetatileId(const QPoint &pos, bool *ok) const {
 }
 
 uint16_t MetatileSelector::posToMetatileId(int x, int y, bool *ok) const {
-    if (ok) *ok = true;
     int index = y * this->numMetatilesWide + x;
+
+    // Single-tileset display modes map their grid directly onto one tileset's metatiles.
+    if (this->m_section == DisplaySection::Primary) {
+        uint16_t metatileId = static_cast<uint16_t>(index);
+        if (primaryTileset() && primaryTileset()->containsMetatileId(metatileId)) {
+            if (ok) *ok = true;
+            return metatileId;
+        }
+        if (ok) *ok = false;
+        return 0;
+    }
+    if (this->m_section == DisplaySection::Secondary) {
+        uint16_t metatileId = static_cast<uint16_t>(Project::getNumMetatilesPrimary() + index);
+        if (displaySecondaryTileset() && displaySecondaryTileset()->containsMetatileId(metatileId)) {
+            if (ok) *ok = true;
+            return metatileId;
+        }
+        if (ok) *ok = false;
+        return 0;
+    }
+
+    if (ok) *ok = true;
     uint16_t metatileId = static_cast<uint16_t>(index);
     if (primaryTileset() && primaryTileset()->containsMetatileId(metatileId)) {
         return metatileId;
@@ -224,6 +284,25 @@ uint16_t MetatileSelector::posToMetatileId(int x, int y, bool *ok) const {
 }
 
 QPoint MetatileSelector::metatileIdToPos(uint16_t metatileId, bool *ok) const {
+    if (this->m_section == DisplaySection::Primary) {
+        if (primaryTileset() && primaryTileset()->containsMetatileId(metatileId)) {
+            if (ok) *ok = true;
+            int index = metatileId;
+            return QPoint(index % this->numMetatilesWide, index / this->numMetatilesWide);
+        }
+        if (ok) *ok = false;
+        return QPoint(0,0);
+    }
+    if (this->m_section == DisplaySection::Secondary) {
+        if (displaySecondaryTileset() && displaySecondaryTileset()->containsMetatileId(metatileId)) {
+            if (ok) *ok = true;
+            int index = metatileId - Project::getNumMetatilesPrimary();
+            return QPoint(index % this->numMetatilesWide, index / this->numMetatilesWide);
+        }
+        if (ok) *ok = false;
+        return QPoint(0,0);
+    }
+
     if (primaryTileset() && primaryTileset()->containsMetatileId(metatileId)) {
         if (ok) *ok = true;
         int index = metatileId;

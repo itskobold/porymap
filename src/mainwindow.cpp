@@ -340,6 +340,13 @@ void MainWindow::initCustomUI() {
     this->mapHeaderForm = new MapHeaderForm();
     ui->layout_HeaderData->addWidget(this->mapHeaderForm);
 
+    // The map canvas renders using the secondary tileset of the active location tab.
+    connect(this->mapHeaderForm, &MapHeaderForm::activeLocationTilesetChanged, this, &MainWindow::onActiveLocationTilesetChanged);
+
+    // The tileset picker above the metatile selector chooses which tileset's metatiles
+    // are shown (the primary tileset, or one of the map's per-location secondaries).
+    connect(ui->tabBar_TilesetSelector, &QTabBar::currentChanged, this, &MainWindow::onTilesetSelectorTabChanged);
+
     // Center zooming on the mouse
     ui->graphicsView_Map->setTransformationAnchor(QGraphicsView::ViewportAnchor::AnchorUnderMouse);
     ui->graphicsView_Map->setResizeAnchor(QGraphicsView::ViewportAnchor::AnchorUnderMouse);
@@ -1320,6 +1327,10 @@ void MainWindow::refreshMapScene() {
     ui->graphicsView_LocationSelector->setScene(editor->scene_location_metatiles);
     ui->graphicsView_LocationSelector->setFixedSize(editor->location_selector_item->pixmap().width() + 2, editor->location_selector_item->pixmap().height() + 2);
 
+    // The metatile selector item is recreated on every redraw, resetting its display
+    // section; rebuild the picker tabs and re-apply the selected section to the new item.
+    refreshTilesetSelectorTabs();
+
     on_mainTabBar_tabBarClicked(ui->mainTabBar->currentIndex());
 }
 
@@ -2041,6 +2052,31 @@ bool MainWindow::save(bool currentOnly) {
                         "\"Num. Locations\" setting:\n\n%1\n\nLower those tiles' location values "
                         "(drawn with the out-of-bounds graphics) or raise Num. Locations, then save again.")
                     .arg(offending.join("\n")),
+                this);
+            return false;
+        }
+
+        // Safety: refuse to save while any secondary-tileset tile sits too close to a tile of
+        // a different location (flagged by the location-error overlay). Such tiles render with
+        // the wrong tileset near a region border in-game.
+        QStringList conflicted;
+        if (currentOnly) {
+            if (this->editor->layout && this->editor->layout->hasLocationConflicts())
+                conflicted << (this->editor->map ? this->editor->map->name() : this->editor->layout->name);
+        } else {
+            for (const QString &mapName : this->editor->project->mapNames()) {
+                Map *map = this->editor->project->getMap(mapName);
+                if (map && map->layout() && map->layout()->hasLocationConflicts())
+                    conflicted << map->name();
+            }
+            conflicted.sort();
+        }
+        if (!conflicted.isEmpty()) {
+            WarningMessage::show(QStringLiteral("Cannot save: location tileset conflicts"),
+                QString("These maps have secondary-tileset tiles within %1 tiles of a tile with a "
+                        "different location (highlighted by the error overlay):\n\n%2\n\nMove those "
+                        "tiles further from the region border, then save again.")
+                    .arg(Layout::LocationConflictRange).arg(conflicted.join("\n")),
                 this);
             return false;
         }
@@ -2955,15 +2991,130 @@ void MainWindow::setSecondaryTileset(const QString &tilesetLabel) {
 
     if (editor->project->secondaryTilesetLabels.contains(tilesetLabel)) {
         editor->updateSecondaryTileset(tilesetLabel);
+        // The secondary tileset is a per-location map header property now (not a layout
+        // property), so record the choice in the active location of the map header. This
+        // marks the map (not the layout) as edited via the header's modified() signal.
+        // Set this before refreshing the per-location tileset list / re-rendering below.
+        if (this->editor->map && this->mapHeaderForm) {
+            this->editor->map->header()->setSecondaryTileset(this->mapHeaderForm->activeLocation(),
+                                                             this->editor->layout->tileset_secondary_label);
+        }
+        editor->updateLocationTilesets();
         redrawMapScene();
         updateTilesetEditor();
         prefab.updatePrefabUi(editor->layout);
-        markLayoutEdited();
     }
 
     // Restore valid text if input was invalid, or sync combo box with new valid setting.
     const QSignalBlocker b(ui->comboBox_SecondaryTileset);
     ui->comboBox_SecondaryTileset->setTextItem(this->editor->layout->tileset_secondary_label);
+}
+
+// Renders the map using the secondary tileset of the currently-active location tab.
+// Triggered when the active tab changes or its secondary tileset is edited in the
+// Header tab. The header itself is updated by MapHeaderForm; here we only refresh the
+// rendered tileset and keep the Map tab's secondary tileset combo box in sync.
+void MainWindow::onActiveLocationTilesetChanged(const QString &tilesetLabel) {
+    if (!this->editor || !this->editor->layout || !this->editor->project)
+        return;
+    if (tilesetLabel.isEmpty() || !this->editor->project->secondaryTilesetLabels.contains(tilesetLabel))
+        return;
+    if (this->editor->layout->tileset_secondary_label != tilesetLabel) {
+        this->editor->updateSecondaryTileset(tilesetLabel);
+        // Refresh the per-location tileset list so the map re-renders each tile with the
+        // secondary tileset of its location, not just the active one.
+        this->editor->updateLocationTilesets();
+        redrawMapScene();
+        updateTilesetEditor();
+        prefab.updatePrefabUi(this->editor->layout);
+    }
+    const QSignalBlocker b(ui->comboBox_SecondaryTileset);
+    ui->comboBox_SecondaryTileset->setTextItem(this->editor->layout->tileset_secondary_label);
+
+    // The active location's tileset label changed, so the picker's secondary tab title
+    // (and the tileset it previews) may be stale.
+    refreshTilesetSelectorTabs();
+}
+
+// Rebuilds the tileset picker's tabs to match the current map's tilesets: one tab for the
+// primary tileset, then one tab per active map location for that location's secondary
+// tileset. In layout-only mode (no map header) the layout's single secondary is shown.
+// Tab data stores the location index a tab maps to, or -1 for the primary tab.
+void MainWindow::refreshTilesetSelectorTabs() {
+    QTabBar *tabBar = ui->tabBar_TilesetSelector;
+
+    // Block signals while rebuilding; we re-apply the selected section explicitly below.
+    const QSignalBlocker b(tabBar);
+
+    const int prevIndex = tabBar->currentIndex();
+    while (tabBar->count() > 0)
+        tabBar->removeTab(tabBar->count() - 1);
+
+    if (!this->editor || !this->editor->metatile_selector_item || !this->editor->layout)
+        return;
+
+    // Tab 0: the primary tileset.
+    tabBar->setTabData(tabBar->addTab("Primary"), QVariant(-1));
+
+    // One secondary tab per location. The map header holds a secondary tileset per
+    // location slot; without a map (layout-only mode) there is just the layout's.
+    if (this->editor->map) {
+        const MapHeader *header = this->editor->map->header();
+        const int numLocations = qBound(1, header->numLocations(), MAX_MAP_LOCATIONS);
+        for (int i = 0; i < numLocations; i++) {
+            QString title = Tileset::stripPrefix(header->secondaryTileset(i));
+            if (title.isEmpty())
+                title = QString("Secondary %1").arg(i + 1);
+            if (numLocations > 1)
+                title = QString("%1: %2").arg(i + 1).arg(title);
+            tabBar->setTabData(tabBar->addTab(title), QVariant(i));
+        }
+    } else {
+        QString title = Tileset::stripPrefix(this->editor->layout->tileset_secondary_label);
+        if (title.isEmpty())
+            title = "Secondary";
+        tabBar->setTabData(tabBar->addTab(title), QVariant(0));
+    }
+
+    // Keep the previously-selected tab if it still exists, otherwise fall back to Primary.
+    const int restore = (prevIndex >= 0 && prevIndex < tabBar->count()) ? prevIndex : 0;
+    tabBar->setCurrentIndex(restore);
+    applyTilesetSelectorTab(restore);
+}
+
+void MainWindow::onTilesetSelectorTabChanged(int index) {
+    applyTilesetSelectorTab(index);
+}
+
+// Points the metatile selector at the tileset section the given picker tab represents and
+// resizes its view to match. The map canvas is unaffected: selecting a non-active
+// location's secondary only changes which metatiles the selector previews.
+void MainWindow::applyTilesetSelectorTab(int index) {
+    if (!this->editor || !this->editor->metatile_selector_item)
+        return;
+
+    QTabBar *tabBar = ui->tabBar_TilesetSelector;
+    if (index < 0 || index >= tabBar->count())
+        return;
+
+    MetatileSelector *selector = this->editor->metatile_selector_item;
+    const int locationIndex = tabBar->tabData(index).toInt();
+    if (locationIndex < 0) {
+        selector->setDisplaySection(MetatileSelector::DisplaySection::Primary);
+    } else {
+        // Resolve this location's secondary tileset. Falls back to the layout's active
+        // secondary (override == nullptr) in layout-only mode.
+        Tileset *secondary = nullptr;
+        if (this->editor->map && this->editor->project) {
+            const QString label = this->editor->map->header()->secondaryTileset(locationIndex);
+            secondary = this->editor->project->getTileset(label);
+        }
+        selector->setDisplaySection(MetatileSelector::DisplaySection::Secondary, secondary, locationIndex);
+    }
+
+    // The displayed sheet changed size; resync the view and re-apply the current zoom.
+    ui->graphicsView_Metatiles->setFixedSize(selector->pixmap().width() + 2, selector->pixmap().height() + 2);
+    refreshMetatileViews();
 }
 
 void MainWindow::on_pushButton_ChangeDimensions_clicked() {
@@ -3273,6 +3424,8 @@ void MainWindow::on_spinBox_SelectedNumLocations_valueChanged(int numLocations) 
         this->editor->map->header()->setNumLocations(numLocations);
         // Re-flag out-of-bounds location tiles against the new limit.
         this->editor->updateLocationLimit();
+        // The number of per-location secondary tabs in the picker follows numLocations.
+        refreshTilesetSelectorTabs();
     }
 }
 

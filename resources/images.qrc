@@ -101,6 +101,7 @@
         <file>images/collisions_unknown.png</file>
         <file>images/locations.png</file>
         <file>images/locations_oob.png</file>
+        <file>images/location_tileset_error.png</file>
         <file>images/Entities_16x16.png</file>
         <file>images/pokemon_icon_placeholder.png</file>
         <file>images/porysplash.gif</file>

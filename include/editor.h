@@ -107,6 +107,8 @@ public:
 
     void updatePrimaryTileset(QString tilesetLabel, bool forceLoad = false);
     void updateSecondaryTileset(QString tilesetLabel, bool forceLoad = false);
+    // Rebuild the layout's per-location secondary tileset list from the current map header.
+    void updateLocationTilesets();
     void toggleBorderVisibility(bool visible, bool enableScriptCallback = true);
     void updateCustomMapAttributes();
 
@@ -212,7 +214,10 @@ public:
         EventMaximum = EventMinimum + 0x10000,
 
         Ruler,
-        ResizeLayoutPopup
+        ResizeLayoutPopup,
+
+        // The location-error overlay draws above all other map graphics, in every view.
+        LocationError,
     };
 
 public slots:

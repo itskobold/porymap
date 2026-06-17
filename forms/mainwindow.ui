@@ -956,6 +956,37 @@
                             </item>
                            </layout>
                           </widget>
+                          <widget class="QWidget" name="metatileSelectorContainer">
+                           <property name="sizePolicy">
+                            <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                             <horstretch>0</horstretch>
+                             <verstretch>4</verstretch>
+                            </sizepolicy>
+                           </property>
+                           <layout class="QVBoxLayout" name="metatileSelectorContainerLayout">
+                            <property name="spacing">
+                             <number>0</number>
+                            </property>
+                            <property name="leftMargin">
+                             <number>0</number>
+                            </property>
+                            <property name="topMargin">
+                             <number>0</number>
+                            </property>
+                            <property name="rightMargin">
+                             <number>0</number>
+                            </property>
+                            <property name="bottomMargin">
+                             <number>0</number>
+                            </property>
+                            <item>
+                             <widget class="QTabBar" name="tabBar_TilesetSelector">
+                              <property name="toolTip">
+                               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Choose which tileset's metatiles to show: the primary tileset, or one of the map's per-location secondary tilesets.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                              </property>
+                             </widget>
+                            </item>
+                            <item>
                           <widget class="QScrollArea" name="scrollArea_MetatileSelector">
                            <property name="sizePolicy">
                             <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
@@ -1075,6 +1106,9 @@
                              </item>
                             </layout>
                            </widget>
+                          </widget>
+                            </item>
+                           </layout>
                           </widget>
                          </widget>
                         </item>

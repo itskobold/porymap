@@ -1,52 +1,125 @@
 #include "mapheader.h"
 
 MapHeader::MapHeader(const MapHeader& other) : MapHeader() {
-    m_song = other.m_song;
-    m_location = other.m_location;
+    m_locations = other.m_locations;
+    m_xPos = other.m_xPos;
+    m_yPos = other.m_yPos;
     m_requiresFlash = other.m_requiresFlash;
     m_weather = other.m_weather;
-    m_type = other.m_type;
-    m_showsLocationName = other.m_showsLocationName;
     m_allowsRunning = other.m_allowsRunning;
     m_allowsBiking = other.m_allowsBiking;
     m_allowsEscaping = other.m_allowsEscaping;
     m_floorNumber = other.m_floorNumber;
     m_numLocations = other.m_numLocations;
-    m_battleScene = other.m_battleScene;
 }
 
 MapHeader &MapHeader::operator=(const MapHeader &other) {
     // We want to call each set function here to ensure any fieldChanged signals
     // are sent as necessary. This does also mean the modified signal can be sent
     // repeatedly (but for now at least that's not a big issue).
-    setSong(other.m_song);
-    setLocation(other.m_location);
+    for (int i = 0; i < MAX_MAP_LOCATIONS; i++)
+        setLocationData(i, other.m_locations[i]);
+    setXPosition(other.m_xPos);
+    setYPosition(other.m_yPos);
     setRequiresFlash(other.m_requiresFlash);
     setWeather(other.m_weather);
-    setType(other.m_type);
-    setShowsLocationName(other.m_showsLocationName);
     setAllowsRunning(other.m_allowsRunning);
     setAllowsBiking(other.m_allowsBiking);
     setAllowsEscaping(other.m_allowsEscaping);
     setFloorNumber(other.m_floorNumber);
     setNumLocations(other.m_numLocations);
-    setBattleScene(other.m_battleScene);
     return *this;
 }
 
-void MapHeader::setSong(const QString &song) {
-    if (m_song == song)
+void MapHeader::setSecondaryTileset(int i, const QString &secondaryTileset) {
+    i = clampLocationIndex(i);
+    if (m_locations[i].secondaryTileset == secondaryTileset)
         return;
-    m_song = song;
-    emit songChanged(m_song);
+    m_locations[i].secondaryTileset = secondaryTileset;
+    if (i == 0)
+        emit secondaryTilesetChanged(secondaryTileset);
+    emit locationDataChanged(i);
     emit modified();
 }
 
-void MapHeader::setLocation(const QString &location) {
-    if (m_location == location)
+void MapHeader::setSong(int i, const QString &song) {
+    i = clampLocationIndex(i);
+    if (m_locations[i].song == song)
         return;
-    m_location = location;
-    emit locationChanged(m_location);
+    m_locations[i].song = song;
+    if (i == 0)
+        emit songChanged(song);
+    emit locationDataChanged(i);
+    emit modified();
+}
+
+void MapHeader::setLocation(int i, const QString &location) {
+    i = clampLocationIndex(i);
+    if (m_locations[i].location == location)
+        return;
+    m_locations[i].location = location;
+    if (i == 0)
+        emit locationChanged(location);
+    emit locationDataChanged(i);
+    emit modified();
+}
+
+void MapHeader::setType(int i, const QString &type) {
+    i = clampLocationIndex(i);
+    if (m_locations[i].type == type)
+        return;
+    m_locations[i].type = type;
+    if (i == 0)
+        emit typeChanged(type);
+    emit locationDataChanged(i);
+    emit modified();
+}
+
+void MapHeader::setBattleScene(int i, const QString &battleScene) {
+    i = clampLocationIndex(i);
+    if (m_locations[i].battleScene == battleScene)
+        return;
+    m_locations[i].battleScene = battleScene;
+    if (i == 0)
+        emit battleSceneChanged(battleScene);
+    emit locationDataChanged(i);
+    emit modified();
+}
+
+void MapHeader::setShowsLocationName(int i, bool showsLocationName) {
+    i = clampLocationIndex(i);
+    if (m_locations[i].showsLocationName == showsLocationName)
+        return;
+    m_locations[i].showsLocationName = showsLocationName;
+    if (i == 0)
+        emit showsLocationNameChanged(showsLocationName);
+    emit locationDataChanged(i);
+    emit modified();
+}
+
+void MapHeader::setLocationData(int i, const LocationData &data) {
+    // Route through the individual setters so the appropriate signals are emitted.
+    setSecondaryTileset(i, data.secondaryTileset);
+    setSong(i, data.song);
+    setLocation(i, data.location);
+    setType(i, data.type);
+    setBattleScene(i, data.battleScene);
+    setShowsLocationName(i, data.showsLocationName);
+}
+
+void MapHeader::setXPosition(int pos) {
+    if (m_xPos == pos)
+        return;
+    m_xPos = pos;
+    emit xPosChanged(m_xPos);
+    emit modified();
+}
+
+void MapHeader::setYPosition(int pos) {
+    if (m_yPos == pos)
+        return;
+    m_yPos = pos;
+    emit yPosChanged(m_yPos);
     emit modified();
 }
 
@@ -63,22 +136,6 @@ void MapHeader::setWeather(const QString &weather) {
         return;
     m_weather = weather;
     emit weatherChanged(m_weather);
-    emit modified();
-}
-
-void MapHeader::setType(const QString &type) {
-    if (m_type == type)
-        return;
-    m_type = type;
-    emit typeChanged(m_type);
-    emit modified();
-}
-
-void MapHeader::setShowsLocationName(bool showsLocationName) {
-    if (m_showsLocationName == showsLocationName)
-        return;
-    m_showsLocationName = showsLocationName;
-    emit showsLocationNameChanged(m_showsLocationName);
     emit modified();
 }
 
@@ -119,13 +176,5 @@ void MapHeader::setNumLocations(int numLocations) {
         return;
     m_numLocations = numLocations;
     emit numLocationsChanged(m_numLocations);
-    emit modified();
-}
-
-void MapHeader::setBattleScene(const QString &battleScene) {
-    if (m_battleScene == battleScene)
-        return;
-    m_battleScene = battleScene;
-    emit battleSceneChanged(m_battleScene);
     emit modified();
 }

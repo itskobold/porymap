@@ -353,14 +353,10 @@ QSet<QString> Project::getTopLevelMapFields() const {
         "id",
         "name",
         "layout",
-        "music",
-        "region_map_section",
         "requires_flash",
         "weather",
-        "map_type",
-        "show_map_name",
-        "battle_scene",
         "num_locations",
+        "locations",
         "connections",
         Event::groupToJsonKey(Event::Group::Object),
         Event::groupToJsonKey(Event::Group::Warp),
@@ -440,13 +436,38 @@ bool Project::loadMapData(Map* map) {
     }
     map->setLayout(layout);
 
-    map->header()->setSong(ParseUtil::jsonToQString(mapObj.take("music")));
-    map->header()->setLocation(ParseUtil::jsonToQString(mapObj.take("region_map_section")));
     map->header()->setRequiresFlash(ParseUtil::jsonToBool(mapObj.take("requires_flash")));
     map->header()->setWeather(ParseUtil::jsonToQString(mapObj.take("weather")));
-    map->header()->setType(ParseUtil::jsonToQString(mapObj.take("map_type")));
-    map->header()->setShowsLocationName(ParseUtil::jsonToBool(mapObj.take("show_map_name")));
-    map->header()->setBattleScene(ParseUtil::jsonToQString(mapObj.take("battle_scene")));
+
+    // Per-location header data (mirrors struct MapHeaderLocationData in pokeemerald).
+    // map.json stores up to MAX_MAP_LOCATIONS sets in a "locations" array; the per-tile
+    // location attribute selects which one is active in-game.
+    if (mapObj.contains("locations")) {
+        const QJsonArray locationsArr = mapObj.take("locations").toArray();
+        for (int i = 0; i < locationsArr.size() && i < MAX_MAP_LOCATIONS; i++) {
+            const QJsonObject locObj = locationsArr.at(i).toObject();
+            MapHeader::LocationData data;
+            data.secondaryTileset  = ParseUtil::jsonToQString(locObj.value("secondary_tileset"));
+            data.song              = ParseUtil::jsonToQString(locObj.value("music"));
+            data.location          = ParseUtil::jsonToQString(locObj.value("region_map_section"));
+            data.type              = ParseUtil::jsonToQString(locObj.value("map_type"));
+            data.battleScene       = ParseUtil::jsonToQString(locObj.value("battle_scene"));
+            data.showsLocationName = ParseUtil::jsonToBool(locObj.value("show_map_name"));
+            map->header()->setLocationData(i, data);
+        }
+    } else {
+        // Legacy maps stored a single location's data as top-level fields, with the
+        // secondary tileset coming from the layout.
+        MapHeader::LocationData data;
+        data.secondaryTileset  = layout->tileset_secondary_label;
+        data.song              = ParseUtil::jsonToQString(mapObj.take("music"));
+        data.location          = ParseUtil::jsonToQString(mapObj.take("region_map_section"));
+        data.type              = ParseUtil::jsonToQString(mapObj.take("map_type"));
+        data.battleScene       = ParseUtil::jsonToQString(mapObj.take("battle_scene"));
+        data.showsLocationName = ParseUtil::jsonToBool(mapObj.take("show_map_name"));
+        map->header()->setLocationData(0, data);
+    }
+
     // Number of per-tile location values used by this map (1-4). Absent in older maps; default to 1.
     if (mapObj.contains("num_locations"))
         map->header()->setNumLocations(ParseUtil::jsonToInt(mapObj.take("num_locations")));
@@ -544,6 +565,12 @@ Map *Project::createNewMap(const Project::NewMapSettings &settings, const Map* t
         }
     }
     map->setLayout(layout);
+
+    // The secondary tileset is a per-location header property now. Seed every location
+    // slot with the new layout's secondary tileset so the map renders consistently and
+    // its map.json "locations" all reference a valid tileset.
+    for (int i = 0; i < MAX_MAP_LOCATIONS; i++)
+        map->header()->setSecondaryTileset(i, layout->tileset_secondary_label);
 
     // Try to record the MAPSEC name in case this is a new name.
     addNewMapsec(map->header()->location());
@@ -740,7 +767,8 @@ bool Project::saveMapLayouts() {
             layoutObj["border_height"] = layout->border_height;
         }
         layoutObj["primary_tileset"] = layout->tileset_primary_label;
-        layoutObj["secondary_tileset"] = layout->tileset_secondary_label;
+        // The secondary tileset is now a per-location property of the map header
+        // (see map.json "locations"), so it's no longer written to the layout.
         layoutObj["border_filepath"] = layout->border_path;
         layoutObj["blockdata_filepath"] = layout->blockdata_path;
         OrderedJson::append(&layoutObj, layout->customData);
@@ -1202,8 +1230,18 @@ bool Project::loadLayoutTilesets(Layout *layout) {
         return false;
     }
     if (layout->tileset_secondary_label.isEmpty()) {
-        logError(QString("Failed to load %1: missing secondary tileset label.").arg(layout->name));
-        return false;
+        // The secondary tileset is a per-location map header property now (not stored in
+        // layouts.json), so it's normally seeded from the maps that use this layout. A
+        // layout that no map references has no secondary tileset to inherit; fall back to
+        // the first available one so the layout can still be opened and edited.
+        if (this->secondaryTilesetLabels.isEmpty()) {
+            logError(QString("Failed to load %1: no secondary tilesets available.").arg(layout->name));
+            return false;
+        }
+        layout->tileset_secondary_label = this->secondaryTilesetLabels.first();
+        logWarn(QString("%1 has no secondary tileset (no map references it); defaulting to '%2'.")
+                    .arg(layout->name)
+                    .arg(layout->tileset_secondary_label));
     }
     if (!this->primaryTilesetLabels.contains(layout->tileset_primary_label)) {
         logError(QString("Failed to load %1: unknown primary tileset label '%2'.")
@@ -1381,22 +1419,33 @@ bool Project::saveMap(Map *map, bool skipLayout) {
     mapObj["id"] = map->constantName();
     mapObj["name"] = map->name();
     mapObj["layout"] = map->layoutId();
-    mapObj["music"] = map->header()->song();
-    mapObj["region_map_section"] = map->header()->location();
     mapObj["requires_flash"] = map->header()->requiresFlash();
     mapObj["weather"] = map->header()->weather();
-    mapObj["map_type"] = map->header()->type();
     if (projectConfig.mapAllowFlagsEnabled) {
         mapObj["allow_cycling"] = map->header()->allowsBiking();
         mapObj["allow_escaping"] = map->header()->allowsEscaping();
         mapObj["allow_running"] = map->header()->allowsRunning();
     }
-    mapObj["show_map_name"] = map->header()->showsLocationName();
     if (projectConfig.floorNumberEnabled) {
         mapObj["floor_number"] = map->header()->floorNumber();
     }
-    mapObj["battle_scene"] = map->header()->battleScene();
     mapObj["num_locations"] = map->header()->numLocations();
+
+    // Per-location header data (mirrors struct MapHeaderLocationData in pokeemerald).
+    // We always write all MAX_MAP_LOCATIONS sets so they're available for editing;
+    // only the first num_locations are compiled into the ROM by the mapjson tool.
+    OrderedJson::array locationsArr;
+    for (int i = 0; i < MAX_MAP_LOCATIONS; i++) {
+        OrderedJson::object locObj;
+        locObj["secondary_tileset"] = map->header()->secondaryTileset(i);
+        locObj["music"] = map->header()->song(i);
+        locObj["region_map_section"] = map->header()->location(i);
+        locObj["map_type"] = map->header()->type(i);
+        locObj["battle_scene"] = map->header()->battleScene(i);
+        locObj["show_map_name"] = map->header()->showsLocationName(i);
+        locationsArr.push_back(locObj);
+    }
+    mapObj["locations"] = locationsArr;
 
     // Connections
     const auto connections = map->getConnections();
@@ -2053,10 +2102,27 @@ bool Project::readMapGroups() {
             // Read layout ID for map list
             const QString layoutId = ParseUtil::jsonToQString(mapObj["layout"]);
             map->setLayoutId(layoutId);
-            map->setLayout(this->mapLayouts.value(layoutId)); // This may set layout to nullptr. Don't report anything until user tries to load this map.
+            Layout *mapLayout = this->mapLayouts.value(layoutId);
+            map->setLayout(mapLayout); // This may set layout to nullptr. Don't report anything until user tries to load this map.
+
+            // The default location's data lives in the "locations" array now. Legacy maps
+            // store it at the top level.
+            QJsonObject defaultLocation = mapObj;
+            const QJsonArray locationsArr = mapObj["locations"].toArray();
+            if (!locationsArr.isEmpty())
+                defaultLocation = locationsArr.at(0).toObject();
 
             // Read MAPSEC name for map list
-            map->header()->setLocation(ParseUtil::jsonToQString(mapObj["region_map_section"]));
+            map->header()->setLocation(ParseUtil::jsonToQString(defaultLocation["region_map_section"]));
+
+            // The secondary tileset is a per-location map header property now, not a layout
+            // property, so it's no longer in layouts.json. Seed the (shared) layout's
+            // secondary tileset from the first map that uses it so the layout can render.
+            if (mapLayout && mapLayout->tileset_secondary_label.isEmpty()) {
+                const QString secondaryTileset = ParseUtil::jsonToQString(defaultLocation["secondary_tileset"]);
+                if (!secondaryTileset.isEmpty())
+                    mapLayout->tileset_secondary_label = secondaryTileset;
+            }
         }
     }
 
@@ -2249,13 +2315,19 @@ void Project::initNewMapSettings() {
     this->newMapSettings.layout.primaryTilesetLabel = getDefaultPrimaryTilesetLabel();
     this->newMapSettings.layout.secondaryTilesetLabel = getDefaultSecondaryTilesetLabel();
 
-    this->newMapSettings.header.setSong(this->defaultSong);
-    this->newMapSettings.header.setLocation(this->mapSectionIdNames.value(0, "0"));
+    // Seed all MAX_MAP_LOCATIONS location slots with the same defaults so a new map's
+    // map.json always has a full, valid "locations" array (matching the data layout).
+    MapHeader::LocationData defaultLocation;
+    defaultLocation.secondaryTileset = this->secondaryTilesetLabels.value(0, QString());
+    defaultLocation.song = this->defaultSong;
+    defaultLocation.location = this->mapSectionIdNames.value(0, "0");
+    defaultLocation.type = this->mapTypes.value(0, "0");
+    defaultLocation.battleScene = this->mapBattleScenes.value(0, "0");
+    defaultLocation.showsLocationName = true;
+    for (int i = 0; i < MAX_MAP_LOCATIONS; i++)
+        this->newMapSettings.header.setLocationData(i, defaultLocation);
     this->newMapSettings.header.setRequiresFlash(false);
     this->newMapSettings.header.setWeather(this->weatherNames.value(0, "0"));
-    this->newMapSettings.header.setType(this->mapTypes.value(0, "0"));
-    this->newMapSettings.header.setBattleScene(this->mapBattleScenes.value(0, "0"));
-    this->newMapSettings.header.setShowsLocationName(true);
     this->newMapSettings.header.setAllowsRunning(false);
     this->newMapSettings.header.setAllowsBiking(false);
     this->newMapSettings.header.setAllowsEscaping(false);

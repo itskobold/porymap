@@ -155,6 +155,37 @@ void Layout::clearBorderCache() {
     this->cached_border.clear();
 }
 
+Tileset *Layout::secondaryTilesetForLocation(int location) const {
+    Tileset *tileset = this->location_tilesets.value(location, nullptr);
+    return tileset ? tileset : this->tileset_secondary;
+}
+
+bool Layout::metatileIsSecondary(uint16_t metatileId) {
+    return metatileId >= Project::getNumMetatilesPrimary();
+}
+
+bool Layout::isLocationConflictTile(int x, int y) const {
+    Block block;
+    if (!getBlock(x, y, &block) || !metatileIsSecondary(block.metatileId()))
+        return false;
+    const uint16_t location = block.location();
+    for (int d = -LocationConflictRange; d <= LocationConflictRange; d++) {
+        if (d == 0) continue;
+        Block other;
+        if (getBlock(x, y + d, &other) && other.location() != location) return true;
+        if (getBlock(x + d, y, &other) && other.location() != location) return true;
+    }
+    return false;
+}
+
+bool Layout::hasLocationConflicts() const {
+    for (int y = 0; y < this->height; y++)
+        for (int x = 0; x < this->width; x++)
+            if (isLocationConflictTile(x, y))
+                return true;
+    return false;
+}
+
 void Layout::cacheBorder() {
     this->cached_border.clear();
     for (const auto &block : this->border)
@@ -383,6 +414,12 @@ void Layout::_floodFillLocation(int x, int y, uint16_t location) {
             continue;
         }
 
+        // A secondary-tileset tile's location is determined by its tileset and can't be
+        // repainted; treat it as a boundary the fill doesn't cross.
+        if (Layout::metatileIsSecondary(block.metatileId())) {
+            continue;
+        }
+
         block.setLocation(location);
         setBlock(x, y, block, true);
         if (getBlock(x + 1, y, &block) && block.location() == old_loc) {
@@ -402,19 +439,23 @@ void Layout::_floodFillLocation(int x, int y, uint16_t location) {
 
 void Layout::floodFillLocation(int x, int y, uint16_t location) {
     Block block;
-    if (getBlock(x, y, &block) && block.location() != location) {
+    if (getBlock(x, y, &block) && block.location() != location
+            && !Layout::metatileIsSecondary(block.metatileId())) {
         _floodFillLocation(x, y, location);
     }
 }
 
 void Layout::magicFillLocation(int initialX, int initialY, uint16_t location) {
     Block block;
-    if (getBlock(initialX, initialY, &block) && block.location() != location) {
+    if (getBlock(initialX, initialY, &block) && block.location() != location
+            && !Layout::metatileIsSecondary(block.metatileId())) {
         uint old_loc = block.location();
 
         for (int y = 0; y < getHeight(); y++) {
             for (int x = 0; x < getWidth(); x++) {
-                if (getBlock(x, y, &block) && block.location() == old_loc) {
+                // Skip secondary-tileset tiles: their location is fixed by their tileset.
+                if (getBlock(x, y, &block) && block.location() == old_loc
+                        && !Layout::metatileIsSecondary(block.metatileId())) {
                     block.setLocation(location);
                     setBlock(x, y, block, true);
                 }
@@ -438,7 +479,10 @@ QPixmap Layout::render(bool ignoreCache, Layout *fromLayout, const QRect &bounds
     // However, during a single pass at rendering the layout there shouldn't be any changes to
     // the tiles, tileset palettes, or metatile layer order/opacity, and layouts often have
     // many repeated metatile IDs, so we create a cache for each request to render the layout.
-    QHash<uint16_t, QImage> imageCache;
+    // A secondary metatile's appearance depends on its tile's location (which selects the
+    // secondary tileset), so the cache is keyed on metatile id plus location for those.
+    QHash<quint32, QImage> imageCache;
+    const Layout *src = fromLayout ? fromLayout : this;
 
     QPainter painter(&this->image);
     for (int i = 0; i < this->blockdata.length(); i++) {
@@ -451,19 +495,24 @@ QPixmap Layout::render(bool ignoreCache, Layout *fromLayout, const QRect &bounds
             continue;
         }
 
-        uint16_t metatileId = this->blockdata.at(i).metatileId();
+        const Block block = this->blockdata.at(i);
+        uint16_t metatileId = block.metatileId();
+        const bool isSecondary = Layout::metatileIsSecondary(metatileId);
+        const quint32 cacheKey = isSecondary
+                ? (static_cast<quint32>(metatileId) | (static_cast<quint32>(block.location()) << 16))
+                : static_cast<quint32>(metatileId);
         QImage metatileImage;
-        if (imageCache.contains(metatileId)) {
-            metatileImage = imageCache.value(metatileId);
+        if (imageCache.contains(cacheKey)) {
+            metatileImage = imageCache.value(cacheKey);
         } else {
             metatileImage = getMetatileImage(
                 metatileId,
-                fromLayout ? fromLayout->tileset_primary   : this->tileset_primary,
-                fromLayout ? fromLayout->tileset_secondary : this->tileset_secondary,
+                src->tileset_primary,
+                isSecondary ? src->secondaryTilesetForLocation(block.location()) : src->tileset_secondary,
                 metatileLayerOrder(),
                 metatileLayerOpacity()
             );
-            imageCache.insert(metatileId, metatileImage);
+            imageCache.insert(cacheKey, metatileImage);
         }
         painter.drawImage(x, y, metatileImage);
         changed_any = true;
@@ -566,7 +615,12 @@ QPixmap Layout::renderBorder(bool ignoreCache) {
         changed_any = true;
         Block block = this->border.at(i);
         uint16_t metatileId = block.metatileId();
-        QImage metatile_image = getMetatileImage(metatileId, this);
+        QImage metatile_image = getMetatileImage(
+                metatileId,
+                this->tileset_primary,
+                Layout::metatileIsSecondary(metatileId) ? secondaryTilesetForLocation(block.location()) : this->tileset_secondary,
+                metatileLayerOrder(),
+                metatileLayerOpacity());
         int x = this->border_width ? ((i % this->border_width) * Metatile::pixelWidth()) : 0;
         int y = this->border_width ? ((i / this->border_width) * Metatile::pixelHeight()) : 0;
         painter.drawImage(x, y, metatile_image);

@@ -47,6 +47,12 @@ public:
     Tileset *tileset_primary = nullptr;
     Tileset *tileset_secondary = nullptr;
 
+    // Secondary tileset for each map location slot (index = a tile's location attribute),
+    // used to render each tile with the secondary tileset of its location. Populated by
+    // the editor from the current map's header. Empty in layout-only mode, where rendering
+    // falls back to the single tileset_secondary above. See secondaryTilesetForLocation().
+    QList<Tileset*> location_tilesets;
+
     QJsonObject customData;
 
     Blockdata blockdata;
@@ -190,6 +196,22 @@ public:
     void setBorderItem(BorderMetatilesPixmapItem *item) { borderItem = item; }
 
     bool metatileIsValid(uint16_t metatileId) { return Tileset::metatileIsValid(metatileId, this->tileset_primary, this->tileset_secondary); }
+
+    // The secondary tileset to render a tile with, given its location attribute. Falls back
+    // to the layout's active secondary tileset for unknown locations (and in layout-only mode).
+    Tileset *secondaryTilesetForLocation(int location) const;
+
+    // True if a metatile belongs to a secondary tileset. Such tiles get their location from
+    // the tileset they're painted from, so their location is locked in the Locations editor.
+    static bool metatileIsSecondary(uint16_t metatileId);
+
+    // A secondary-tileset tile this close (vertically or horizontally) to a tile of a
+    // different location renders with the wrong tileset near a region border in-game.
+    static constexpr int LocationConflictRange = 8;
+    // True if the tile at (x, y) is such a conflict. Used by the editor's error overlay.
+    bool isLocationConflictTile(int x, int y) const;
+    // True if the layout contains any conflict tile. Used to block saving until resolved.
+    bool hasLocationConflicts() const;
 
 private:
     void setNewDimensionsBlockdata(int newWidth, int newHeight);
