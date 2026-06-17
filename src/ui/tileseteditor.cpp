@@ -12,11 +12,14 @@
 #include "eventfilters.h"
 #include "utility.h"
 #include "message.h"
+#include "mapheader.h"
 #include <QDialogButtonBox>
 #include <QCloseEvent>
 #include <QImageReader>
+#include <QTabBar>
+#include <QVBoxLayout>
 
-TilesetEditor::TilesetEditor(Project *project, Layout *layout, QWidget *parent) :
+TilesetEditor::TilesetEditor(Project *project, Layout *layout, const MapHeader *header, QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::TilesetEditor),
     project(project),
@@ -25,6 +28,8 @@ TilesetEditor::TilesetEditor(Project *project, Layout *layout, QWidget *parent) 
 {
     setAttribute(Qt::WA_DeleteOnClose);
     ui->setupUi(this);
+
+    setupLocationTabs();
 
     ui->spinBox_paletteSelector->setRange(0, Project::getNumPalettesTotal() - 1);
 
@@ -75,6 +80,23 @@ TilesetEditor::TilesetEditor(Project *project, Layout *layout, QWidget *parent) 
     initShortcuts();
     setMetatileLayerOrientation(porymapConfig.tilesetEditorLayerOrientation);
     this->metatileSelector->select(0);
+
+    // Populate the per-location tab bar from the current map's header. Each location
+    // slot pairs the shared primary tileset with its own secondary tileset.
+    QStringList secondaryLabels;
+    int numLocations = 1;
+    if (header) {
+        numLocations = header->numLocations();
+        for (int i = 0; i < MAX_MAP_LOCATIONS; i++)
+            secondaryLabels.append(header->secondaryTileset(i));
+    } else {
+        // Layout-only mode: a single location using the layout's secondary tileset.
+        secondaryLabels.append(this->layout->tileset_secondary_label);
+    }
+    refreshLocationTabs(secondaryLabels, numLocations);
+    // Select the tab for the location that's currently loaded (the map's active one).
+    selectLocationTabForSecondary(this->layout->tileset_secondary_label);
+
     restoreWindowState();
 }
 
@@ -92,6 +114,8 @@ TilesetEditor::~TilesetEditor()
 void TilesetEditor::update(Layout *layout, QString primaryTilesetLabel, QString secondaryTilesetLabel) {
     this->updateLayout(layout);
     this->updateTilesets(primaryTilesetLabel, secondaryTilesetLabel);
+    // The loaded pair changed; sync the tab bar to the location whose secondary we loaded.
+    selectLocationTabForSecondary(secondaryTilesetLabel);
 }
 
 void TilesetEditor::updateLayout(Layout *layout) {
@@ -390,6 +414,85 @@ void TilesetEditor::restoreWindowState() {
     this->restoreGeometry(geometry.value("tileset_editor_geometry"));
     this->restoreState(geometry.value("tileset_editor_state"));
     this->ui->splitter->restoreState(geometry.value("tileset_editor_splitter_state"));
+}
+
+void TilesetEditor::setupLocationTabs() {
+    this->locationTabBar = this->ui->tabBar_Locations;
+
+    // One tab per possible location slot. Tabs beyond the map's location count are
+    // disabled in refreshLocationTabs().
+    for (int i = 0; i < MAX_MAP_LOCATIONS; i++) {
+        this->locationTabBar->addTab(QString("Location %1").arg(i + 1));
+    }
+    connect(this->locationTabBar, &QTabBar::currentChanged, this, &TilesetEditor::onLocationTabChanged);
+}
+
+void TilesetEditor::refreshLocationTabs(const QStringList &secondaryLabels, int numLocations) {
+    if (!this->locationTabBar)
+        return;
+
+    this->locationSecondaryLabels = secondaryLabels;
+    this->numLocations = qBound(1, numLocations, MAX_MAP_LOCATIONS);
+
+    // Update labels and enabled state without disturbing the user's selected tab.
+    {
+        const QSignalBlocker b(this->locationTabBar);
+        for (int i = 0; i < this->locationTabBar->count(); i++) {
+            const QString secondary = secondaryLabels.value(i);
+            QString text = QString("Location %1").arg(i + 1);
+            if (!secondary.isEmpty())
+                text += QString(" (%1)").arg(Tileset::stripPrefix(secondary));
+            this->locationTabBar->setTabText(i, text);
+            this->locationTabBar->setTabEnabled(i, i < this->numLocations);
+        }
+    }
+
+    if (this->currentLocation >= this->numLocations) {
+        // The tab we were editing is no longer available; switch to the last valid one.
+        // Not signal-blocked, so onLocationTabChanged() reloads the edited pair.
+        this->locationTabBar->setCurrentIndex(this->numLocations - 1);
+    } else {
+        const QSignalBlocker b(this->locationTabBar);
+        this->locationTabBar->setCurrentIndex(this->currentLocation);
+    }
+}
+
+void TilesetEditor::updateLocations(const QStringList &secondaryLabels, int numLocations) {
+    refreshLocationTabs(secondaryLabels, numLocations);
+}
+
+// Selects the tab for the given secondary tileset without reloading (used when the
+// edited pair was already loaded elsewhere). Leaves the selection unchanged if no
+// enabled location uses that secondary.
+void TilesetEditor::selectLocationTabForSecondary(const QString &secondaryLabel) {
+    if (!this->locationTabBar)
+        return;
+    for (int i = 0; i < this->numLocations && i < this->locationSecondaryLabels.size(); i++) {
+        if (this->locationSecondaryLabels.at(i) == secondaryLabel) {
+            this->currentLocation = i;
+            const QSignalBlocker b(this->locationTabBar);
+            this->locationTabBar->setCurrentIndex(i);
+            return;
+        }
+    }
+}
+
+void TilesetEditor::onLocationTabChanged(int index) {
+    if (index < 0 || index == this->currentLocation)
+        return;
+
+    const QString secondary = this->locationSecondaryLabels.value(index);
+    if (secondary.isEmpty() || !this->project->secondaryTilesetLabels.contains(secondary)) {
+        // No valid secondary tileset for this location; revert the selection.
+        const QSignalBlocker b(this->locationTabBar);
+        this->locationTabBar->setCurrentIndex(this->currentLocation);
+        return;
+    }
+
+    // Switch the edited pair to this location's secondary tileset. updateTilesets()
+    // prompts to save any unsaved changes before reloading.
+    this->currentLocation = index;
+    updateTilesets(this->layout->tileset_primary_label, secondary);
 }
 
 void TilesetEditor::onWindowActivated() {

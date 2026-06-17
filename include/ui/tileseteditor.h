@@ -14,6 +14,8 @@
 
 class NoScrollComboBox;
 class Layout;
+class MapHeader;
+class QTabBar;
 
 namespace Ui {
 class TilesetEditor;
@@ -54,9 +56,13 @@ class TilesetEditor : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit TilesetEditor(Project *project, Layout *layout, QWidget *parent = nullptr);
+    explicit TilesetEditor(Project *project, Layout *layout, const MapHeader *header, QWidget *parent = nullptr);
     ~TilesetEditor();
     void update(Layout *layout, QString primaryTilsetLabel, QString secondaryTilesetLabel);
+    // Refreshes the per-location tab bar (labels, enabled state) without reloading the
+    // edited tileset pair or changing the user's selected tab. 'secondaryLabels' holds
+    // one secondary tileset label per location slot.
+    void updateLocations(const QStringList &secondaryLabels, int numLocations);
     void updateLayout(Layout *layout);
     void updateTilesets(QString primaryTilsetLabel, QString secondaryTilesetLabel);
     bool selectMetatile(uint16_t metatileId);
@@ -79,6 +85,7 @@ private slots:
     void onHoveredTileCleared();
     void onMetatileLayerSelectionChanged(const QPoint&, const QSize&);
     void onPaletteEditorChangedPaletteColor();
+    void onLocationTabChanged(int index);
 
     void on_actionChange_Metatiles_Count_triggered();
 
@@ -114,6 +121,9 @@ private:
     void initMetatileLayersItem();
     void initShortcuts();
     void initExtraShortcuts();
+    void setupLocationTabs();
+    void refreshLocationTabs(const QStringList &secondaryLabels, int numLocations);
+    void selectLocationTabForSecondary(const QString &secondaryLabel);
     void restoreWindowState();
     void initMetatileHistory();
     void setTilesets(QString primaryTilesetLabel, QString secondaryTilesetLabel);
@@ -181,6 +191,13 @@ private:
     MetatileImageExporter::Settings *metatileImageExportSettings = nullptr;
     QList<QPair<uint16_t,uint16_t>> metatileIdSwaps;
     int numLayerViewRows;
+
+    // Per-location tab bar. Each tab pairs the shared primary tileset with that
+    // location's secondary tileset for editing.
+    QTabBar *locationTabBar = nullptr;
+    QStringList locationSecondaryLabels;
+    int numLocations = 1;
+    int currentLocation = 0;
 
     bool save();
 

@@ -1421,7 +1421,14 @@ void MainWindow::displayMapProperties() {
         return;
     }
     ui->frame_HeaderData->setEnabled(true);
-    this->mapHeaderForm->setHeader(editor->map->header());
+    MapHeader *header = editor->map->header();
+    this->mapHeaderForm->setHeader(header);
+
+    // Keep the Tileset Editor's location tabs in sync when the header's location count
+    // or a location's secondary tileset changes. UniqueConnection avoids duplicates as
+    // this runs on every map load.
+    connect(header, &MapHeader::numLocationsChanged, this, &MainWindow::refreshTilesetEditorLocations, Qt::UniqueConnection);
+    connect(header, &MapHeader::locationDataChanged, this, &MainWindow::refreshTilesetEditorLocations, Qt::UniqueConnection);
 
     ui->mapCustomAttributesFrame->table()->setAttributes(editor->map->customAttributes());
 }
@@ -1876,6 +1883,7 @@ void MainWindow::updateTilesetEditor() {
             editor->ui->comboBox_PrimaryTileset->currentText(),
             this->editor->layout->tileset_secondary_label
         );
+        refreshTilesetEditorLocations();
     }
 }
 
@@ -3200,8 +3208,29 @@ void MainWindow::on_actionTileset_Editor_triggered()
 }
 
 void MainWindow::initTilesetEditor() {
-    this->tilesetEditor = new TilesetEditor(this->editor->project, this->editor->layout, this);
+    const MapHeader *header = this->editor->map ? this->editor->map->header() : nullptr;
+    this->tilesetEditor = new TilesetEditor(this->editor->project, this->editor->layout, header, this);
     connect(this->tilesetEditor, &TilesetEditor::tilesetsSaved, this, &MainWindow::onTilesetsSaved);
+}
+
+// Forwards the current map's per-location secondary tilesets to the open Tileset Editor
+// so its location tab bar stays in sync (labels, enabled state, active tab). Unlike
+// updateTilesetEditor() this does not reload the edited tileset pair.
+void MainWindow::refreshTilesetEditorLocations() {
+    if (!this->tilesetEditor || !this->editor)
+        return;
+
+    QStringList secondaryLabels;
+    int numLocations = 1;
+    if (this->editor->map) {
+        const MapHeader *header = this->editor->map->header();
+        numLocations = header->numLocations();
+        for (int i = 0; i < MAX_MAP_LOCATIONS; i++)
+            secondaryLabels.append(header->secondaryTileset(i));
+    } else if (this->editor->layout) {
+        secondaryLabels.append(this->editor->layout->tileset_secondary_label);
+    }
+    this->tilesetEditor->updateLocations(secondaryLabels, numLocations);
 }
 
 MapListToolBar* MainWindow::getMapListToolBar(int tab) {

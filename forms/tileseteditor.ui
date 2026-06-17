@@ -17,7 +17,12 @@
    <string>Tileset Editor</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QHBoxLayout" name="horizontalLayout">
+   <layout class="QVBoxLayout" name="verticalLayout_Main">
+    <item>
+     <widget class="QTabBar" name="tabBar_Locations"/>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout">
     <item>
      <widget class="QSplitter" name="splitter">
       <property name="orientation">
@@ -840,6 +845,8 @@
        </layout>
       </widget>
      </widget>
+    </item>
+     </layout>
     </item>
    </layout>
   </widget>

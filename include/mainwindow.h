@@ -452,6 +452,7 @@ private:
     void restoreWindowState();
     void setTheme(QString);
     void updateTilesetEditor();
+    void refreshTilesetEditorLocations();
     Event::Group getEventGroupFromTabWidget(QWidget *tab);
     bool closeSupplementaryWindows();
     void setWindowDisabled(bool);
