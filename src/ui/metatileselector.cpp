@@ -90,9 +90,9 @@ bool MetatileSelector::select(uint16_t metatileId) {
     return true;
 }
 
-void MetatileSelector::selectFromMap(uint16_t metatileId, uint16_t collision, uint16_t elevation) {
+void MetatileSelector::selectFromMap(uint16_t metatileId, uint16_t collision, uint16_t elevation, int location) {
     QPair<uint16_t, uint16_t> movePermissions(collision, elevation);
-    this->setExternalSelection(1, 1, {metatileId}, {movePermissions});
+    this->setExternalSelection(1, 1, {metatileId}, {movePermissions}, {location});
 }
 
 void MetatileSelector::setLayout(Layout *layout) {
@@ -110,12 +110,13 @@ void MetatileSelector::refresh() {
     setLayout(this->layout);
 }
 
-void MetatileSelector::setExternalSelection(int width, int height, const QList<uint16_t> &metatiles, const QList<QPair<uint16_t, uint16_t>> &collisions) {
+void MetatileSelector::setExternalSelection(int width, int height, const QList<uint16_t> &metatiles, const QList<QPair<uint16_t, uint16_t>> &collisions, const QList<int> &locations) {
     this->prefabSelection = false;
     this->externalSelection = true;
     this->externalSelectionWidth = width;
     this->externalSelectionHeight = height;
     this->externalSelectedMetatiles.clear();
+    this->externalSelectedLocations.clear();
     this->selection.metatileItems.clear();
     this->selection.collisionItems.clear();
     this->selection.hasCollision = true;
@@ -124,11 +125,13 @@ void MetatileSelector::setExternalSelection(int width, int height, const QList<u
         uint16_t metatileId = metatiles.at(i);
         uint16_t collision = collisions.at(i).first;
         uint16_t elevation = collisions.at(i).second;
+        int location = locations.value(i, -1);
         this->selection.collisionItems.append(CollisionSelectionItem{true, collision, elevation});
         this->externalSelectedMetatiles.append(metatileId);
+        this->externalSelectedLocations.append(location);
         if (!this->layout->metatileIsValid(metatileId))
             metatileId = 0;
-        this->selection.metatileItems.append(MetatileSelectionItem{true, metatileId});
+        this->selection.metatileItems.append(MetatileSelectionItem{true, metatileId, location});
     }
     if (this->selection.metatileItems.length() == 1) {
         SelectablePixmapItem::select(metatileIdToPos(this->selection.metatileItems.first().metatileId));
@@ -228,9 +231,10 @@ void MetatileSelector::updateExternalSelectedMetatiles() {
     this->selection.dimensions = QSize(this->externalSelectionWidth, this->externalSelectionHeight);
     for (int i = 0; i < this->externalSelectedMetatiles.count(); ++i) {
         uint16_t metatileId = this->externalSelectedMetatiles.at(i);
+        int location = this->externalSelectedLocations.value(i, -1);
         if (!this->layout->metatileIsValid(metatileId))
             metatileId = 0;
-        this->selection.metatileItems.append(MetatileSelectionItem{true, metatileId});
+        this->selection.metatileItems.append(MetatileSelectionItem{true, metatileId, location});
     }
     emit selectedMetatilesChanged();
 }

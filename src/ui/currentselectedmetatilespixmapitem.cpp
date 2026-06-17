@@ -17,7 +17,17 @@ QPixmap drawMetatileSelection(MetatileSelection selection, Layout *layout) {
             int index = j * selection.dimensions.width() + i;
             MetatileSelectionItem item = selection.metatileItems.value(index);
             if (item.enabled) {
-                QImage metatile_image = getMetatileImage(item.metatileId, layout);
+                // Tiles picked off the map carry their source location, so render secondary
+                // metatiles with that location's secondary tileset (matching the canvas)
+                // rather than the active location's.
+                QImage metatile_image;
+                if (item.location >= 0 && Layout::metatileIsSecondary(item.metatileId)) {
+                    metatile_image = getMetatileImage(item.metatileId, layout->tileset_primary,
+                                                      layout->secondaryTilesetForLocation(item.location),
+                                                      layout->metatileLayerOrder(), layout->metatileLayerOpacity());
+                } else {
+                    metatile_image = getMetatileImage(item.metatileId, layout);
+                }
                 painter.drawImage(metatile_origin, metatile_image);
             }
         }

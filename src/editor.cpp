@@ -1348,8 +1348,6 @@ bool Editor::setMap(QString map_name) {
     const QString headerTileset = this->map->header()->secondaryTileset(0);
     if (!headerTileset.isEmpty() && this->project->secondaryTilesetLabels.contains(headerTileset)) {
         updateSecondaryTileset(headerTileset, true);
-        const QSignalBlocker b(ui->comboBox_SecondaryTileset);
-        ui->comboBox_SecondaryTileset->setTextItem(this->layout->tileset_secondary_label);
     }
 
     // Load every location's secondary tileset so tiles render with the tileset of their
@@ -1381,8 +1379,12 @@ bool Editor::setLayout(QString layoutId) {
         return false;
     }
 
-    QString prevLayoutName;
-    if (this->layout) prevLayoutName = this->layout->name;
+    QString prevLayoutName, prevPrimaryTileset, prevSecondaryTileset;
+    if (this->layout) {
+        prevLayoutName = this->layout->name;
+        prevPrimaryTileset = this->layout->tileset_primary_label;
+        prevSecondaryTileset = this->layout->tileset_secondary_label;
+    }
 
     Layout *loadedLayout = this->project->loadLayout(layoutId);
     if (!loadedLayout) {
@@ -1399,13 +1401,10 @@ bool Editor::setLayout(QString layoutId) {
     map_ruler->setMapDimensions(QSize(this->layout->getWidth(), this->layout->getHeight()));
     connect(this->layout, &Layout::dimensionsChanged, map_ruler, &MapRuler::setMapDimensions);
 
-    QString prevPrimaryTileset = ui->comboBox_PrimaryTileset->currentText();
-    QString prevSecondaryTileset = ui->comboBox_SecondaryTileset->currentText();
-
+    // The secondary tileset is chosen per-location in the Header tab, so only the primary
+    // tileset has a combo box on the Metatiles tab to keep in sync here.
     const QSignalBlocker b_PrimaryTilest(ui->comboBox_PrimaryTileset);
-    const QSignalBlocker b_SecondaryTilest(ui->comboBox_SecondaryTileset);
     ui->comboBox_PrimaryTileset->setTextItem(this->layout->tileset_primary_label);
-    ui->comboBox_SecondaryTileset->setTextItem(this->layout->tileset_secondary_label);
 
     const QSignalBlocker b0(this->ui->comboBox_LayoutSelector);
     int index = this->ui->comboBox_LayoutSelector->findText(layoutId);

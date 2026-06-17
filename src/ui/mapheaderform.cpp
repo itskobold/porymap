@@ -159,6 +159,13 @@ void MapHeaderForm::populateComboBoxes() {
     }
 }
 
+void MapHeaderForm::insertSecondaryTileset(int index, const QString &label) {
+    for (auto &tab : m_tabs) {
+        const QSignalBlocker b(tab.comboBox_SecondaryTileset);
+        tab.comboBox_SecondaryTileset->insertItem(index, label);
+    }
+}
+
 void MapHeaderForm::setLocationItems(const QStringList &locations) {
     for (auto &tab : m_tabs) {
         const QSignalBlocker b(tab.comboBox_Location);

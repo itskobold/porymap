@@ -397,7 +397,6 @@ void MainWindow::initExtraSignals() {
     connect(ui->checkBox_ToggleBorder, &QCheckBox::toggled, this, &MainWindow::setBorderVisibility);
     connect(ui->checkBox_MirrorConnections, &QCheckBox::toggled, this, &MainWindow::setMirrorConnectionsEnabled);
     connect(ui->comboBox_PrimaryTileset, &NoScrollComboBox::editingFinished, [this] { setPrimaryTileset(ui->comboBox_PrimaryTileset->currentText()); });
-    connect(ui->comboBox_SecondaryTileset, &NoScrollComboBox::editingFinished, [this] { setSecondaryTileset(ui->comboBox_SecondaryTileset->currentText()); });
     connect(ui->actionDuplicate_Current_Map, &QAction::triggered, [this] {
         if (this->editor->map) openDuplicateMapDialog(this->editor->map->name());
     });
@@ -1475,9 +1474,8 @@ bool MainWindow::setProjectUI() {
     ui->comboBox_PrimaryTileset->clear();
     ui->comboBox_PrimaryTileset->addItems(project->primaryTilesetLabels);
 
-    const QSignalBlocker b_SecondaryTileset(ui->comboBox_SecondaryTileset);
-    ui->comboBox_SecondaryTileset->clear();
-    ui->comboBox_SecondaryTileset->addItems(project->secondaryTilesetLabels);
+    // Secondary tilesets are chosen per-location in the Header tab (MapHeaderForm), so the
+    // Metatiles tab only exposes the primary tileset.
 
     const QSignalBlocker b_LayoutSelector(ui->comboBox_LayoutSelector);
     ui->comboBox_LayoutSelector->clear();
@@ -1560,9 +1558,6 @@ void MainWindow::clearProjectUI() {
     // Clear project comboboxes
     const QSignalBlocker b_PrimaryTileset(ui->comboBox_PrimaryTileset);
     ui->comboBox_PrimaryTileset->clear();
-
-    const QSignalBlocker b_SecondaryTileset(ui->comboBox_SecondaryTileset);
-    ui->comboBox_SecondaryTileset->clear();
 
     ui->comboBox_DiveMap->clear();
     ui->comboBox_EmergeMap->clear();
@@ -1809,8 +1804,11 @@ void MainWindow::onNewTilesetCreated(Tileset *tileset) {
         int index = this->editor->project->primaryTilesetLabels.indexOf(tileset->name);
         ui->comboBox_PrimaryTileset->insertItem(index, tileset->name);
     } else {
+        // Secondary tilesets are assigned per-location in the Header tab, so make the new
+        // one selectable there.
         int index = this->editor->project->secondaryTilesetLabels.indexOf(tileset->name);
-        ui->comboBox_SecondaryTileset->insertItem(index, tileset->name);
+        if (this->mapHeaderForm)
+            this->mapHeaderForm->insertSecondaryTileset(index, tileset->name);
     }
 }
 
@@ -1876,7 +1874,7 @@ void MainWindow::updateTilesetEditor() {
         this->tilesetEditor->update(
             this->editor->layout,
             editor->ui->comboBox_PrimaryTileset->currentText(),
-            editor->ui->comboBox_SecondaryTileset->currentText()
+            this->editor->layout->tileset_secondary_label
         );
     }
 }
@@ -2073,10 +2071,11 @@ bool MainWindow::save(bool currentOnly) {
         }
         if (!conflicted.isEmpty()) {
             WarningMessage::show(QStringLiteral("Cannot save: location tileset conflicts"),
-                QString("These maps have secondary-tileset tiles within %1 tiles of a tile with a "
-                        "different location (highlighted by the error overlay):\n\n%2\n\nMove those "
-                        "tiles further from the region border, then save again.")
-                    .arg(Layout::LocationConflictRange).arg(conflicted.join("\n")),
+                QString("These maps have secondary-tileset tiles within %1 tiles horizontally or %2 "
+                        "tiles vertically of a tile with a different location (highlighted by the "
+                        "error overlay):\n\n%3\n\nMove those tiles further from the region border, "
+                        "then save again.")
+                    .arg(Layout::LocationConflictRangeH).arg(Layout::LocationConflictRangeV).arg(conflicted.join("\n")),
                 this);
             return false;
         }
@@ -2122,9 +2121,13 @@ void MainWindow::copy() {
             OrderedJson::object copyObject;
             copyObject["object"] = "metatile_selection";
             OrderedJson::array metatiles;
+            OrderedJson::array locations;
             MetatileSelection selection = editor->metatile_selector_item->getMetatileSelection();
             for (auto item : selection.metatileItems) {
                 metatiles.append(static_cast<int>(item.metatileId));
+                // Preserve the per-tile location so pasting reproduces the right secondary
+                // tileset; -1 means "use the active location" (e.g. picker selections).
+                locations.append(item.location);
             }
             OrderedJson::array collisions;
             if (selection.hasCollision) {
@@ -2146,6 +2149,7 @@ void MainWindow::copy() {
                 }
             }
             copyObject["metatile_selection"] = metatiles;
+            copyObject["location_selection"] = locations;
             copyObject["collision_selection"] = collisions;
             copyObject["width"] = editor->metatile_selector_item->getSelectionDimensions().width();
             copyObject["height"] = editor->metatile_selector_item->getSelectionDimensions().height();
@@ -2263,17 +2267,23 @@ void MainWindow::paste() {
                 }
                 QJsonArray metatilesArray = pasteObject["metatile_selection"].toArray();
                 QJsonArray collisionsArray = pasteObject["collision_selection"].toArray();
+                QJsonArray locationsArray = pasteObject["location_selection"].toArray();
                 int width = ParseUtil::jsonToInt(pasteObject["width"]);
                 int height = ParseUtil::jsonToInt(pasteObject["height"]);
                 QList<uint16_t> metatiles;
                 QList<QPair<uint16_t, uint16_t>> collisions;
+                QList<int> locations;
                 for (auto tile : metatilesArray) {
                     metatiles.append(static_cast<uint16_t>(tile.toInt()));
                 }
                 for (QJsonValue collision : collisionsArray) {
                     collisions.append({static_cast<uint16_t>(collision["collision"].toInt()), static_cast<uint16_t>(collision["elevation"].toInt())});
                 }
-                editor->metatile_selector_item->setExternalSelection(width, height, metatiles, collisions);
+                // Older clipboard data has no location array; default to -1 (active location).
+                for (QJsonValue location : locationsArray) {
+                    locations.append(location.toInt(-1));
+                }
+                editor->metatile_selector_item->setExternalSelection(width, height, metatiles, collisions, locations);
                 break;
             }
             case MainTab::Events:
@@ -3004,16 +3014,12 @@ void MainWindow::setSecondaryTileset(const QString &tilesetLabel) {
         updateTilesetEditor();
         prefab.updatePrefabUi(editor->layout);
     }
-
-    // Restore valid text if input was invalid, or sync combo box with new valid setting.
-    const QSignalBlocker b(ui->comboBox_SecondaryTileset);
-    ui->comboBox_SecondaryTileset->setTextItem(this->editor->layout->tileset_secondary_label);
 }
 
 // Renders the map using the secondary tileset of the currently-active location tab.
 // Triggered when the active tab changes or its secondary tileset is edited in the
 // Header tab. The header itself is updated by MapHeaderForm; here we only refresh the
-// rendered tileset and keep the Map tab's secondary tileset combo box in sync.
+// rendered tileset.
 void MainWindow::onActiveLocationTilesetChanged(const QString &tilesetLabel) {
     if (!this->editor || !this->editor->layout || !this->editor->project)
         return;
@@ -3028,8 +3034,6 @@ void MainWindow::onActiveLocationTilesetChanged(const QString &tilesetLabel) {
         updateTilesetEditor();
         prefab.updatePrefabUi(this->editor->layout);
     }
-    const QSignalBlocker b(ui->comboBox_SecondaryTileset);
-    ui->comboBox_SecondaryTileset->setTextItem(this->editor->layout->tileset_secondary_label);
 
     // The active location's tileset label changed, so the picker's secondary tab title
     // (and the tileset it previews) may be stale.
@@ -3114,6 +3118,13 @@ void MainWindow::applyTilesetSelectorTab(int index) {
 
     // The displayed sheet changed size; resync the view and re-apply the current zoom.
     ui->graphicsView_Metatiles->setFixedSize(selector->pixmap().width() + 2, selector->pixmap().height() + 2);
+
+    // A QGraphicsScene's rect only ever grows to fit its items, it never shrinks. After
+    // switching from the (taller) combined sheet to a shorter single-tileset section the
+    // scene rect would stay at the old height, and since the view centers its scene the
+    // section's metatiles (which sit at the top) would be pushed out of view, leaving the
+    // picker blank. Pin the view's scene rect to the current sheet so it stays top-aligned.
+    ui->graphicsView_Metatiles->setSceneRect(selector->pixmap().rect());
     refreshMetatileViews();
 }
 

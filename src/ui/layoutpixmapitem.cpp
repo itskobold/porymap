@@ -21,6 +21,13 @@ static void setBlockMetatile(Block *block, uint16_t metatileId, int paintLocatio
         block->setLocation(static_cast<uint16_t>(paintLocation));
 }
 
+// The location to stamp for a painted tile. A selection item picked off the map carries
+// its source location (item.location >= 0), so it reproduces that location's secondary
+// tileset; otherwise we fall back to the picker's active paint location.
+static int locationForItem(const MetatileSelectionItem &item, int paintLocation) {
+    return item.location >= 0 ? item.location : paintLocation;
+}
+
 void LayoutPixmapItem::paint(QGraphicsSceneMouseEvent *event) {
     if (layout) {
         if (event->type() == QEvent::GraphicsSceneMouseRelease) {
@@ -144,7 +151,7 @@ void LayoutPixmapItem::paintNormal(int x, int y, bool fromScriptCall) {
             MetatileSelectionItem item = selection.metatileItems.value(index);
             if (!item.enabled)
                 continue;
-            setBlockMetatile(&block, item.metatileId, paintLocation);
+            setBlockMetatile(&block, item.metatileId, locationForItem(item, paintLocation));
             if (selection.hasCollision && selection.collisionItems.length() == selection.metatileItems.length()) {
                 CollisionSelectionItem collisionItem = selection.collisionItems.value(index);
                 block.setCollision(collisionItem.collision);
@@ -215,6 +222,7 @@ void LayoutPixmapItem::paintSmartPath(int x, int y, bool fromScriptCall) {
 
     // Shift to the middle tile of the smart path selection.
     uint16_t openMetatileId = selection.metatileItems.at(smartPathMiddleIndex).metatileId;
+    int openLocation = locationForItem(selection.metatileItems.at(smartPathMiddleIndex), paintLocation);
     uint16_t openCollision = 0;
     uint16_t openElevation = 0;
     bool setCollisions = false;
@@ -236,7 +244,7 @@ void LayoutPixmapItem::paintSmartPath(int x, int y, bool fromScriptCall) {
         int actualY = j + y;
         Block block;
         if (this->layout->getBlock(actualX, actualY, &block)) {
-            setBlockMetatile(&block, openMetatileId, paintLocation);
+            setBlockMetatile(&block, openMetatileId, openLocation);
             if (setCollisions) {
                 block.setCollision(openCollision);
                 block.setElevation(openElevation);
@@ -279,7 +287,8 @@ void LayoutPixmapItem::paintSmartPath(int x, int y, bool fromScriptCall) {
         if (this->layout->getBlock(actualX - 1, actualY, &left) && isSmartPathTile(selection.metatileItems, left.metatileId()))
             id += 8;
 
-        setBlockMetatile(&block, selection.metatileItems.at(smartPathTable[id]).metatileId, paintLocation);
+        const MetatileSelectionItem &pathItem = selection.metatileItems.at(smartPathTable[id]);
+        setBlockMetatile(&block, pathItem.metatileId, locationForItem(pathItem, paintLocation));
         if (setCollisions) {
             CollisionSelectionItem collisionItem = selection.collisionItems.at(smartPathTable[id]);
             block.setCollision(collisionItem.collision);
@@ -346,7 +355,7 @@ void LayoutPixmapItem::updateMetatileSelection(QGraphicsSceneMouseEvent *event) 
         selection.append(QPoint(pos.x(), pos.y()));
         Block block;
         if (this->layout->getBlock(pos.x(), pos.y(), &block)) {
-            this->metatileSelector->selectFromMap(block.metatileId(), block.collision(), block.elevation());
+            this->metatileSelector->selectFromMap(block.metatileId(), block.collision(), block.elevation(), block.location());
         }
     } else if (event->type() == QEvent::GraphicsSceneMouseMove) {
         if (pos == this->lastMetatileSelectionPos)
@@ -367,6 +376,7 @@ void LayoutPixmapItem::updateMetatileSelection(QGraphicsSceneMouseEvent *event) 
 
         QList<uint16_t> metatiles;
         QList<QPair<uint16_t, uint16_t>> collisions;
+        QList<int> locations;
         for (QPoint point : selection) {
             int x = point.x();
             int y = point.y();
@@ -379,9 +389,10 @@ void LayoutPixmapItem::updateMetatileSelection(QGraphicsSceneMouseEvent *event) 
             auto collision = block.collision();
             auto elevation = block.elevation();
             collisions.append(QPair<uint16_t, uint16_t>(collision, elevation));
+            locations.append(block.location());
         }
 
-        this->metatileSelector->setExternalSelection(x2 - x1 + 1, y2 - y1 + 1, metatiles, collisions);
+        this->metatileSelector->setExternalSelection(x2 - x1 + 1, y2 - y1 + 1, metatiles, collisions, locations);
     }
 }
 
@@ -456,7 +467,7 @@ void LayoutPixmapItem::magicFill(
                     if (j < 0) j = selectionDimensions.height() + j;
                     int index = j * selectionDimensions.width() + i;
                     if (index < selectedMetatiles.length() && selectedMetatiles.at(index).enabled) {
-                        setBlockMetatile(&block, selectedMetatiles.at(index).metatileId, paintLocation);
+                        setBlockMetatile(&block, selectedMetatiles.at(index).metatileId, locationForItem(selectedMetatiles.at(index), paintLocation));
                         if (setCollisions) {
                             CollisionSelectionItem item = selectedCollisions.at(index);
                             block.setCollision(item.collision);
@@ -519,7 +530,7 @@ void LayoutPixmapItem::floodFill(
         uint16_t metatileId = selectedMetatiles.value(index).metatileId;
         uint16_t old_metatileId = block.metatileId();
         if (selectedMetatiles.value(index).enabled && (selectedMetatiles.count() != 1 || old_metatileId != metatileId)) {
-            setBlockMetatile(&block, metatileId, paintLocation);
+            setBlockMetatile(&block, metatileId, locationForItem(selectedMetatiles.value(index), paintLocation));
             if (setCollisions) {
                 CollisionSelectionItem item = selectedCollisions.value(index);
                 block.setCollision(item.collision);
@@ -558,6 +569,7 @@ void LayoutPixmapItem::floodFillSmartPath(int initialX, int initialY, bool fromS
 
     // Shift to the middle tile of the smart path selection.
     uint16_t openMetatileId = selection.metatileItems.at(smartPathMiddleIndex).metatileId;
+    int openLocation = locationForItem(selection.metatileItems.at(smartPathMiddleIndex), paintLocation);
     uint16_t openCollision = 0;
     uint16_t openElevation = 0;
     bool setCollisions = false;
@@ -587,7 +599,7 @@ void LayoutPixmapItem::floodFillSmartPath(int initialX, int initialY, bool fromS
             continue;
         }
 
-        setBlockMetatile(&block, openMetatileId, paintLocation);
+        setBlockMetatile(&block, openMetatileId, openLocation);
         if (setCollisions) {
             block.setCollision(openCollision);
             block.setElevation(openElevation);
@@ -637,7 +649,8 @@ void LayoutPixmapItem::floodFillSmartPath(int initialX, int initialY, bool fromS
         if (this->layout->getBlock(x - 1, y, &left) && isSmartPathTile(selection.metatileItems, left.metatileId()))
             id += 8;
 
-        setBlockMetatile(&block, selection.metatileItems.at(smartPathTable[id]).metatileId, paintLocation);
+        const MetatileSelectionItem &pathItem = selection.metatileItems.at(smartPathTable[id]);
+        setBlockMetatile(&block, pathItem.metatileId, locationForItem(pathItem, paintLocation));
         if (setCollisions) {
             CollisionSelectionItem item = selection.collisionItems.at(smartPathTable[id]);
             block.setCollision(item.collision);
@@ -673,7 +686,7 @@ void LayoutPixmapItem::pick(QGraphicsSceneMouseEvent *event) {
     QPoint pos = Metatile::coordFromPixmapCoord(event->pos());
     Block block;
     if (this->layout->getBlock(pos.x(), pos.y(), &block)) {
-        this->metatileSelector->selectFromMap(block.metatileId(), block.collision(), block.elevation());
+        this->metatileSelector->selectFromMap(block.metatileId(), block.collision(), block.elevation(), block.location());
     }
 }
 

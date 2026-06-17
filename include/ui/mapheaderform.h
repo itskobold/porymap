@@ -36,6 +36,10 @@ public:
     void setProject(Project * project, bool allowProjectChanges = true);
     void clear();
 
+    // Adds a newly-created secondary tileset to each location's tileset selector, keeping
+    // the current selections intact. Called when a tileset is created mid-session.
+    void insertSecondaryTileset(int index, const QString &label);
+
     void setHeader(MapHeader *header);
     void setHeaderData(const MapHeader &header);
     MapHeader headerData() const;

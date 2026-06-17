@@ -205,9 +205,11 @@ public:
     // the tileset they're painted from, so their location is locked in the Locations editor.
     static bool metatileIsSecondary(uint16_t metatileId);
 
-    // A secondary-tileset tile this close (vertically or horizontally) to a tile of a
-    // different location renders with the wrong tileset near a region border in-game.
-    static constexpr int LocationConflictRange = 8;
+    // A secondary-tileset tile this close to a tile of a different location renders with
+    // the wrong tileset near a region border in-game. The in-game view is wider than it is
+    // tall, so the conflict range is larger horizontally than vertically.
+    static constexpr int LocationConflictRangeH = 7;
+    static constexpr int LocationConflictRangeV = 5;
     // True if the tile at (x, y) is such a conflict. Used by the editor's error overlay.
     bool isLocationConflictTile(int x, int y) const;
     // True if the layout contains any conflict tile. Used to block saving until resolved.

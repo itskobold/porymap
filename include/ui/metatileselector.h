@@ -11,10 +11,15 @@ struct MetatileSelectionItem
 {
     bool enabled;
     uint16_t metatileId;
+    // The location this metatile was copied from when picked off the map, or -1 when it
+    // came from the tileset picker. For secondary metatiles this is the location slot whose
+    // secondary tileset the tile belongs to, so picking a tile and painting it back
+    // reproduces the correct tileset rather than always using the active location's.
+    int location;
 
     // Default values + compatibility with older compilers
-    MetatileSelectionItem(bool enabled_ = false, uint16_t metatileId_ = 0)
-        : enabled(enabled_), metatileId(metatileId_) {}
+    MetatileSelectionItem(bool enabled_ = false, uint16_t metatileId_ = 0, int location_ = -1)
+        : enabled(enabled_), metatileId(metatileId_), location(location_) {}
 };
 
 struct CollisionSelectionItem
@@ -74,10 +79,14 @@ public:
     int paintLocation() const { return this->m_section == DisplaySection::Secondary ? this->m_secondaryLocation : -1; }
 
     bool select(uint16_t metatile);
-    void selectFromMap(uint16_t metatileId, uint16_t collision, uint16_t elevation);
+    // 'location' is the source block's location when picking off the map (-1 otherwise);
+    // see MetatileSelectionItem::location.
+    void selectFromMap(uint16_t metatileId, uint16_t collision, uint16_t elevation, int location = -1);
     MetatileSelection getMetatileSelection() const { return this->selection; }
     void setPrefabSelection(MetatileSelection selection);
-    void setExternalSelection(int, int, const QList<uint16_t>&, const QList<QPair<uint16_t, uint16_t>>&);
+    // 'locations' optionally gives the source location of each metatile (parallel to
+    // 'metatiles'); pass an empty list when the metatiles didn't come from the map.
+    void setExternalSelection(int, int, const QList<uint16_t>&, const QList<QPair<uint16_t, uint16_t>>&, const QList<int> &locations = {});
     QPoint getMetatileIdCoordsOnWidget(uint16_t metatileId) const;
     void setLayout(Layout *layout);
     bool isInternalSelection() const { return (!this->externalSelection && !this->prefabSelection); }
@@ -108,6 +117,8 @@ private:
     int externalSelectionWidth;
     int externalSelectionHeight;
     QList<uint16_t> externalSelectedMetatiles;
+    // Parallel to externalSelectedMetatiles: the source location of each, or -1.
+    QList<int> externalSelectedLocations;
     MetatileSelection selection;
     QPoint cellPos;
 

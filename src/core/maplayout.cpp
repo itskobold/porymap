@@ -169,11 +169,14 @@ bool Layout::isLocationConflictTile(int x, int y) const {
     if (!getBlock(x, y, &block) || !metatileIsSecondary(block.metatileId()))
         return false;
     const uint16_t location = block.location();
-    for (int d = -LocationConflictRange; d <= LocationConflictRange; d++) {
+    Block other;
+    for (int d = -LocationConflictRangeH; d <= LocationConflictRangeH; d++) {
         if (d == 0) continue;
-        Block other;
-        if (getBlock(x, y + d, &other) && other.location() != location) return true;
         if (getBlock(x + d, y, &other) && other.location() != location) return true;
+    }
+    for (int d = -LocationConflictRangeV; d <= LocationConflictRangeV; d++) {
+        if (d == 0) continue;
+        if (getBlock(x, y + d, &other) && other.location() != location) return true;
     }
     return false;
 }
