@@ -2,6 +2,7 @@
 #include "imageproviders.h"
 #include "metatile.h"
 #include "editcommands.h"
+#include "project.h"
 #include <QPainter>
 
 void BorderMetatilesPixmapItem::mousePressEvent(QGraphicsSceneMouseEvent *event) {
@@ -23,6 +24,9 @@ void BorderMetatilesPixmapItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
     for (int i = 0; i < selection.dimensions.width() && (i + pos.x()) < width; i++) {
         for (int j = 0; j < selection.dimensions.height() && (j + pos.y()) < height; j++) {
             MetatileSelectionItem item = selection.metatileItems.value(j * selection.dimensions.width() + i);
+            // The map border can only render metatiles from the primary tileset, so skip secondary metatiles.
+            if (item.metatileId >= Project::getNumMetatilesPrimary())
+                continue;
             layout->setBorderMetatileId(pos.x() + i, pos.y() + j, item.metatileId, true);
         }
     }
