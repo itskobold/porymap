@@ -197,10 +197,13 @@ bool Layout::isLocationConflictTile(int x, int y, const QList<MapConnection*> &c
     const uint16_t location = block.location();
     Tileset * const tileset = secondaryTilesetForLocation(location);
 
-    auto conflictsAt = [&](int nx, int ny) -> bool {
+    // When borderOnly is set, the tile is only considered if it lies across a map connection
+    // (off the edge of this layout). This is used for the one extra tile of range we scan past
+    // a map border - that reach should only apply across the border, not within this layout.
+    auto conflictsAt = [&](int nx, int ny, bool borderOnly) -> bool {
         Block other;
         if (getBlock(nx, ny, &other))
-            return other.location() != location;
+            return !borderOnly && other.location() != location;
         // Off the edge of this layout: follow a map connection into the adjacent map. Its
         // location IDs are independent of ours, so compare the secondary tileset each resolves
         // to instead - a different tileset there is what renders incorrectly across the border.
@@ -210,11 +213,13 @@ bool Layout::isLocationConflictTile(int x, int y, const QList<MapConnection*> &c
         return false;
     };
 
-    for (int d = -LocationConflictRangeH; d <= LocationConflictRangeH; d++) {
-        if (d != 0 && conflictsAt(x + d, y)) return true;
+    // Scan one extra tile past the normal range in each direction; that extra tile only counts
+    // when it falls across a map border (see borderOnly above).
+    for (int d = -(LocationConflictRangeH + 1); d <= LocationConflictRangeH + 1; d++) {
+        if (d != 0 && conflictsAt(x + d, y, qAbs(d) > LocationConflictRangeH)) return true;
     }
-    for (int d = -LocationConflictRangeV; d <= LocationConflictRangeV; d++) {
-        if (d != 0 && conflictsAt(x, y + d)) return true;
+    for (int d = -(LocationConflictRangeV + 1); d <= LocationConflictRangeV + 1; d++) {
+        if (d != 0 && conflictsAt(x, y + d, qAbs(d) > LocationConflictRangeV)) return true;
     }
     return false;
 }
