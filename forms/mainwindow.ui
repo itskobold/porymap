@@ -1261,8 +1261,8 @@
                            </property>
                            <property name="minimumSize">
                             <size>
-                             <width>64</width>
-                             <height>512</height>
+                             <width>160</width>
+                             <height>40</height>
                             </size>
                            </property>
                            <property name="verticalScrollBarPolicy">
@@ -1344,25 +1344,15 @@
                         <enum>QFrame::Shadow::Raised</enum>
                        </property>
                        <layout class="QGridLayout" name="gridLayout_8">
-                        <item row="0" column="1">
-                         <widget class="QSpinBox" name="spinBox_SelectedElevation"/>
-                        </item>
-                        <item row="1" column="0">
-                         <widget class="QLabel" name="label_17">
-                          <property name="text">
-                           <string>Collision</string>
-                          </property>
-                         </widget>
-                        </item>
-                        <item row="1" column="1">
-                         <widget class="QSpinBox" name="spinBox_SelectedCollision"/>
-                        </item>
                         <item row="0" column="0">
                          <widget class="QLabel" name="label_16">
                           <property name="text">
-                           <string>Elevation</string>
+                           <string>Elevation level</string>
                           </property>
                          </widget>
+                        </item>
+                        <item row="0" column="1">
+                         <widget class="QSpinBox" name="spinBox_SelectedElevation"/>
                         </item>
                         <item row="0" column="2">
                          <spacer name="horizontalSpacer_4">
@@ -1376,6 +1366,22 @@
                            </size>
                           </property>
                          </spacer>
+                        </item>
+                        <item row="1" column="0" colspan="3">
+                         <widget class="QSlider" name="horizontalSlider_CollisionLevel">
+                          <property name="toolTip">
+                           <string>Elevation level for the &quot;all levels&quot; collision tile</string>
+                          </property>
+                          <property name="minimum">
+                           <number>0</number>
+                          </property>
+                          <property name="maximum">
+                           <number>123</number>
+                          </property>
+                          <property name="orientation">
+                           <enum>Qt::Orientation::Horizontal</enum>
+                          </property>
+                         </widget>
                         </item>
                        </layout>
                       </widget>

@@ -4,6 +4,21 @@
 
 #include <QObject>
 
+// The per-tile attribute is a single elevation value. The first NumSpecialElevations
+// values are reserved special movement types (elevation change, impassable, water,
+// multi-level); ordinary elevation "levels" begin at FirstElevationLevel and are shown
+// to the user as (value - FirstElevationLevel).
+namespace Elevation {
+    enum Special : uint16_t {
+        ElevationChange = 0,
+        Impassable = 1,
+        Water = 2,
+        MultiLevel = 3,
+    };
+    constexpr int NumSpecial = 4;
+    constexpr int FirstLevel = NumSpecial;
+}
+
 class Block
 {
 public:

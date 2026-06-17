@@ -23,8 +23,9 @@
 
 static bool selectNewEvents = false;
 
-// 2D array mapping collision+elevation combos to an icon.
-QList<QList<const QImage*>> Editor::collisionIcons;
+// Icons for the special elevation values (elevation change, impassable, water,
+// multi-level), indexed by value. Ordinary elevation levels are drawn procedurally.
+QList<const QImage*> Editor::collisionIcons;
 
 // Array mapping location values to an icon.
 QList<const QImage*> Editor::locationIcons;
@@ -81,8 +82,7 @@ Editor::~Editor()
     delete this->playerViewRect;
     delete this->cursorMapTileRect;
     delete this->map_ruler;
-    for (auto sublist : collisionIcons)
-        qDeleteAll(sublist);
+    qDeleteAll(collisionIcons);
     qDeleteAll(locationIcons);
     qDeleteAll(locationOobIcons);
 
@@ -1109,8 +1109,8 @@ void Editor::onBorderMetatilesChanged() {
     updateBorderVisibility();
 }
 
-void Editor::onHoveredMovementPermissionChanged(uint16_t collision, uint16_t elevation) {
-    this->ui->statusBar->showMessage(this->getMovementPermissionText(collision, elevation));
+void Editor::onHoveredMovementPermissionChanged(uint16_t value) {
+    this->ui->statusBar->showMessage(this->getMovementPermissionText(value));
 }
 
 void Editor::onHoveredMovementPermissionCleared() {
@@ -1280,7 +1280,7 @@ void Editor::setStatusFromMapPos(const QPoint &pos) {
         this->ui->statusBar->showMessage(QString("X: %1, Y: %2, %3")
                               .arg(pos.x())
                               .arg(pos.y())
-                              .arg(this->getMovementPermissionText(block.collision(), block.elevation())));
+                              .arg(this->getMovementPermissionText(block.elevation())));
     } else if (this->editMode == EditMode::Locations) {
         this->ui->statusBar->showMessage(QString("X: %1, Y: %2, Location: %3")
                               .arg(pos.x())
@@ -1294,20 +1294,15 @@ void Editor::setStatusFromMapPos(const QPoint &pos) {
     }
 }
 
-QString Editor::getMovementPermissionText(uint16_t collision, uint16_t elevation) {
-    QString message;
-    if (collision != 0) {
-        message = QString("Collision: Impassable (%1), Elevation: %2").arg(collision).arg(elevation);
-    } else if (elevation == 0) {
-        message = "Collision: Transition between elevations";
-    } else if (elevation == 15) {
-        message = "Collision: Multi-Level (Bridge)";
-    } else if (elevation == 1) {
-        message = "Collision: Surf";
-    } else {
-        message = QString("Collision: Passable, Elevation: %1").arg(elevation);
+QString Editor::getMovementPermissionText(uint16_t value) {
+    switch (value) {
+    case Elevation::ElevationChange: return "Elevation: Transition between elevations";
+    case Elevation::Impassable:      return "Elevation: Impassable";
+    case Elevation::Water:           return "Elevation: Surfable Water";
+    case Elevation::MultiLevel:      return "Elevation: Multi-Level (Bridge)";
+    default:
+        return QString("Elevation: Level %1").arg(value - Elevation::FirstLevel);
     }
-    return message;
 }
 
 void Editor::unsetMap() {
@@ -1726,7 +1721,7 @@ void Editor::clearMapMovementPermissions() {
 void Editor::displayMapMovementPermissions() {
     clearMapMovementPermissions();
 
-    collision_item = new CollisionPixmapItem(this->layout, ui->spinBox_SelectedCollision, ui->spinBox_SelectedElevation,
+    collision_item = new CollisionPixmapItem(this->layout, this->movement_permissions_selector_item,
                                              this->metatile_selector_item, this->settings, &this->collisionOpacity);
     connect(collision_item, &CollisionPixmapItem::mouseEvent, this, &Editor::mouseEvent_map);
     connect(collision_item, &CollisionPixmapItem::hoverEntered, this, &Editor::onMapHoverEntered);
@@ -1825,10 +1820,14 @@ void Editor::displayMovementPermissionSelector() {
                 this, &Editor::onHoveredMovementPermissionChanged);
         connect(movement_permissions_selector_item, &MovementPermissionsSelector::hoveredMovementPermissionCleared,
                 this, &Editor::onHoveredMovementPermissionCleared);
-        connect(movement_permissions_selector_item, &SelectablePixmapItem::selectionChanged, [this](const QPoint &pos, const QSize&) {
-            this->setCollisionTabSpinBoxes(pos.x(), pos.y());
+        // Keep the elevation-level controls in sync with the selected value, whether it
+        // changes by clicking a picker cell or programmatically (e.g. picking from the map).
+        connect(movement_permissions_selector_item, &SelectablePixmapItem::selectionChanged, [this](const QPoint&, const QSize&) {
+            this->setCollisionTabElevationLevel(this->movement_permissions_selector_item->selectedValue());
         });
-        movement_permissions_selector_item->select(projectConfig.defaultCollision, projectConfig.defaultElevation);
+        connect(movement_permissions_selector_item, &MovementPermissionsSelector::selectedValueChanged,
+                this, &Editor::setCollisionTabElevationLevel);
+        movement_permissions_selector_item->setSelectedValue(projectConfig.defaultElevation);
     }
 
     scene_collision_metatiles->addItem(movement_permissions_selector_item);
@@ -2519,11 +2518,16 @@ bool Editor::startDetachedProcess(const QString &command, const QString &working
     return process.startDetached(pid);
 }
 
-void Editor::setCollisionTabSpinBoxes(uint16_t collision, uint16_t elevation) {
-    const QSignalBlocker blocker1(ui->spinBox_SelectedCollision);
-    const QSignalBlocker blocker2(ui->spinBox_SelectedElevation);
-    ui->spinBox_SelectedCollision->setValue(collision);
-    ui->spinBox_SelectedElevation->setValue(elevation);
+// Reflect the selector's current value in the elevation-level controls. Only ordinary
+// elevation levels (4+) map to a level; the special values leave the controls unchanged.
+void Editor::setCollisionTabElevationLevel(uint16_t value) {
+    if (value < Elevation::FirstLevel)
+        return;
+    const int level = value - Elevation::FirstLevel;
+    const QSignalBlocker blocker1(ui->spinBox_SelectedElevation);
+    const QSignalBlocker blocker2(ui->horizontalSlider_CollisionLevel);
+    ui->spinBox_SelectedElevation->setValue(level);
+    ui->horizontalSlider_CollisionLevel->setValue(level);
 }
 
 void Editor::setLocationTabSpinBoxes(uint16_t location) {
@@ -2606,32 +2610,22 @@ void Editor::setCollisionGraphics() {
     if (this->movement_permissions_selector_item)
         this->movement_permissions_selector_item->setBasePixmap(this->collisionSheetPixmap);
 
-    for (auto sublist : collisionIcons)
-        qDeleteAll(sublist);
+    qDeleteAll(collisionIcons);
     collisionIcons.clear();
 
-    // Use the image sheet to create an icon for each collision/elevation combination.
-    // Any icons for combinations that aren't provided by the image sheet are also created now using default graphics.
+    // The collision sheet is a horizontal strip of cells. The first Elevation::NumSpecial
+    // cells are the icons for the special elevation values (elevation change, impassable,
+    // water, multi-level); the final "all levels" cell is only shown in the picker (ordinary
+    // elevation levels are drawn procedurally on the map). Build an on-map icon for each
+    // special value here.
     const int w = Metatile::pixelWidth(), h = Metatile::pixelHeight();
     imgSheet = imgSheet.scaled(w * imgColumns, h * imgRows);
-    for (int collision = 0; collision <= Block::getMaxCollision(); collision++) {
-        // If (collision >= imgColumns) here, it's a valid collision value, but it is not represented with an icon on the image sheet.
-        // In this case we just use the rightmost collision icon. This is mostly to support the vanilla case, where technically 0-3
-        // are valid collision values, but 1-3 have the same meaning, so the vanilla collision selector image only has 2 columns.
-        int x = ((collision < imgColumns) ? collision : (imgColumns - 1)) * w;
-
-        QList<const QImage*> sublist;
-        for (int elevation = 0; elevation <= Block::getMaxElevation(); elevation++) {
-            if (elevation < imgRows) {
-                // This elevation has an icon on the image sheet, add it to the list
-                int y = elevation * h;
-                sublist.append(new QImage(imgSheet.copy(x, y, w, h)));
-            } else {
-                // This is a valid elevation value, but it has no icon on the image sheet.
-                // Give it a placeholder "?" icon (red if impassable, white otherwise)
-                sublist.append(new QImage(this->collisionPlaceholder.copy(x != 0 ? w : 0, 0, w, h)));
-            }
+    for (int value = 0; value < Elevation::NumSpecial; value++) {
+        if (value < imgColumns) {
+            collisionIcons.append(new QImage(imgSheet.copy(value * w, 0, w, h)));
+        } else {
+            // This special value has no icon on the image sheet; use a placeholder.
+            collisionIcons.append(new QImage(this->collisionPlaceholder.copy(0, 0, w, h)));
         }
-        collisionIcons.append(sublist);
     }
 }

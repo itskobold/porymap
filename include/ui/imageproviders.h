@@ -9,7 +9,7 @@
 class Layout;
 
 QImage getCollisionMetatileImage(Block);
-QImage getCollisionMetatileImage(int, int);
+QImage getCollisionMetatileImage(int value);
 
 QImage getLocationMetatileImage(Block);
 QImage getLocationMetatileImage(int);

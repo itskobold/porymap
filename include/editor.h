@@ -184,7 +184,7 @@ public:
     int scaleIndex = 2;
     qreal collisionOpacity = 0.5;
     qreal locationOpacity = 0.5;
-    static QList<QList<const QImage*>> collisionIcons;
+    static QList<const QImage*> collisionIcons;
     static QList<const QImage*> locationIcons;
     static QList<const QImage*> locationOobIcons;
 
@@ -269,9 +269,9 @@ private:
     void onDivingMapEditingFinished(NoScrollComboBox* combo, const QString &direction);
     void updateDivingMapButton(QToolButton* button, const QString &mapName);
     void updateEncounterFields(EncounterFields newFields);
-    QString getMovementPermissionText(uint16_t collision, uint16_t elevation);
+    QString getMovementPermissionText(uint16_t value);
     QString getMetatileDisplayMessage(uint16_t metatileId);
-    void setCollisionTabSpinBoxes(uint16_t collision, uint16_t elevation);
+    void setCollisionTabElevationLevel(uint16_t value);
     void setLocationTabSpinBoxes(uint16_t location);
     void adjustStraightPathPos(QGraphicsSceneMouseEvent *event, LayoutPixmapItem *item, QPoint *pos) const;
     static bool startDetachedProcess(const QString &command,
@@ -287,7 +287,7 @@ private slots:
     void setSmartPathCursorMode(QGraphicsSceneMouseEvent *event);
     void mouseEvent_map(QGraphicsSceneMouseEvent *event, LayoutPixmapItem *item);
     void setSelectedConnectionItem(ConnectionPixmapItem *connectionItem);
-    void onHoveredMovementPermissionChanged(uint16_t, uint16_t);
+    void onHoveredMovementPermissionChanged(uint16_t);
     void onHoveredMovementPermissionCleared();
     void onHoveredMetatileSelectionChanged(uint16_t);
     void onHoveredMetatileSelectionCleared();

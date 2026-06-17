@@ -3659,8 +3659,10 @@ void Project::applyParsedLimits() {
     projectConfig.defaultMetatileId = qMin(projectConfig.defaultMetatileId, Block::getMaxMetatileId());
     projectConfig.defaultElevation = qMin(projectConfig.defaultElevation, Block::getMaxElevation());
     projectConfig.defaultCollision = qMin(projectConfig.defaultCollision, Block::getMaxCollision());
+    // The collision sheet is a single horizontal strip of cells: one per special elevation
+    // value (elevation change, impassable, water, multi-level) plus the "all levels" cell.
     projectConfig.collisionSheetSize.setHeight(qBound(1, projectConfig.collisionSheetSize.height(), Block::getMaxElevation() + 1));
-    projectConfig.collisionSheetSize.setWidth(qBound(1, projectConfig.collisionSheetSize.width(), Block::getMaxCollision() + 1));
+    projectConfig.collisionSheetSize.setWidth(qBound(1, projectConfig.collisionSheetSize.width(), Elevation::NumSpecial + 1));
 }
 
 bool Project::hasUnsavedChanges() {

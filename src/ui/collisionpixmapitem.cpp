@@ -29,8 +29,7 @@ void CollisionPixmapItem::paint(QGraphicsSceneMouseEvent *event) {
 
         Block block;
         if (this->layout->getBlock(pos.x(), pos.y(), &block)) {
-            block.setCollision(this->selectedCollision->value());
-            block.setElevation(this->selectedElevation->value());
+            block.setElevation(this->selector->selectedValue());
             this->layout->setBlock(pos.x(), pos.y(), block, true);
         }
 
@@ -47,9 +46,7 @@ void CollisionPixmapItem::floodFill(QGraphicsSceneMouseEvent *event) {
         Blockdata oldCollision = this->layout->blockdata;
 
         QPoint pos = Metatile::coordFromPixmapCoord(event->pos());
-        uint16_t collision = this->selectedCollision->value();
-        uint16_t elevation = this->selectedElevation->value();
-        this->layout->floodFillCollisionElevation(pos.x(), pos.y(), collision, elevation);
+        this->layout->floodFillCollisionElevation(pos.x(), pos.y(), 0, this->selector->selectedValue());
 
         if (this->layout->blockdata != oldCollision) {
             this->layout->editHistory.push(new BucketFillCollision(this->layout, oldCollision, this->layout->blockdata));
@@ -63,9 +60,7 @@ void CollisionPixmapItem::magicFill(QGraphicsSceneMouseEvent *event) {
     } else if (this->layout) {
         Blockdata oldCollision = this->layout->blockdata;
         QPoint pos = Metatile::coordFromPixmapCoord(event->pos());
-        uint16_t collision = this->selectedCollision->value();
-        uint16_t elevation = this->selectedElevation->value();
-        this->layout->magicFillCollisionElevation(pos.x(), pos.y(), collision, elevation);
+        this->layout->magicFillCollisionElevation(pos.x(), pos.y(), 0, this->selector->selectedValue());
 
         if (this->layout->blockdata != oldCollision) {
             this->layout->editHistory.push(new MagicFillCollision(this->layout, oldCollision, this->layout->blockdata));
@@ -92,7 +87,6 @@ void CollisionPixmapItem::updateMovementPermissionSelection(QGraphicsSceneMouseE
 void CollisionPixmapItem::updateSelection(QPoint pos) {
     Block block;
     if (this->layout->getBlock(pos.x(), pos.y(), &block)) {
-        this->selectedCollision->setValue(block.collision());
-        this->selectedElevation->setValue(block.elevation());
+        this->selector->setSelectedValue(block.elevation());
     }
 }

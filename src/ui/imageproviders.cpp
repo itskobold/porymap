@@ -1,15 +1,68 @@
 #include "config.h"
 #include "imageproviders.h"
 #include "editor.h"
+#include "block.h"
+#include "metatile.h"
 #include <QPainter>
+#include <QFont>
 
 QImage getCollisionMetatileImage(Block block) {
-    return getCollisionMetatileImage(block.collision(), block.elevation());
+    return getCollisionMetatileImage(block.elevation());
 }
 
-QImage getCollisionMetatileImage(int collision, int elevation) {
-    const QImage * image = Editor::collisionIcons.value(collision).value(elevation);
-    return image ? *image : QImage();
+// Builds the on-map graphic for an ordinary elevation level: the elevation tile image
+// tinted by a colour interpolated from yellow (lowest level) to cyan (highest level),
+// with the level number centred.
+static QImage getElevationMetatileImage(int value) {
+    const int w = Metatile::pixelWidth();
+    const int h = Metatile::pixelHeight();
+
+    // Base tile image, loaded once and scaled to the metatile size.
+    static const QImage baseTile = QImage(":/images/elevation_tile.png").scaled(w, h).convertToFormat(QImage::Format_ARGB32);
+    QImage image = baseTile;
+    if (image.isNull()) {
+        image = QImage(w, h, QImage::Format_ARGB32);
+        image.fill(Qt::white);
+    }
+
+    const int level = value - Elevation::FirstLevel;
+    const int maxLevel = static_cast<int>(Block::getMaxElevation()) - Elevation::FirstLevel;
+    double t = (maxLevel > 0) ? (static_cast<double>(level) / static_cast<double>(maxLevel)) : 0.0;
+    t = qBound(0.0, t, 1.0);
+
+    // Yellow (255,255,0) -> Cyan (0,255,255).
+    const QColor tint(static_cast<int>(255 * (1.0 - t)), 255, static_cast<int>(255 * t));
+
+    QPainter painter(&image);
+    // Multiply the tile's pixels by the tint colour, then restore the tile's alpha so
+    // transparent areas stay transparent.
+    painter.setCompositionMode(QPainter::CompositionMode_Multiply);
+    painter.fillRect(image.rect(), tint);
+    if (!baseTile.isNull()) {
+        painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+        painter.drawImage(0, 0, baseTile);
+    }
+
+    painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    QFont font = painter.font();
+    font.setPixelSize(h / 2);
+    font.setBold(true);
+    painter.setFont(font);
+    painter.setPen(Qt::black);
+    painter.drawText(QRect(0, 0, w, h), Qt::AlignCenter, QString::number(level));
+    painter.end();
+    return image;
+}
+
+// The single per-tile attribute value selects how the tile is drawn on the Collision tab:
+// the special values (0-3) use the icons from the collision sheet, while ordinary
+// elevation levels (4+) are drawn as coloured, numbered tiles.
+QImage getCollisionMetatileImage(int value) {
+    if (value < Elevation::NumSpecial) {
+        const QImage * image = Editor::collisionIcons.value(value);
+        return image ? *image : QImage();
+    }
+    return getElevationMetatileImage(value);
 }
 
 QImage getLocationMetatileImage(Block block) {

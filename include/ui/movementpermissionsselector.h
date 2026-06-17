@@ -2,7 +2,15 @@
 #define MOVEMENTPERMISSIONSSELECTOR_H
 
 #include "selectablepixmapitem.h"
+#include "block.h"
 
+// Selector used on the Collision tab (and reused, generically, on the Locations tab).
+//
+// On the Collision tab the sheet is a horizontal strip of cells representing a single
+// per-tile elevation value. The first Elevation::NumSpecial cells are the special
+// movement types (elevation change, impassable, water, multi-level); the final cell is
+// the "all levels" tile, whose value is FirstLevel plus the separately-set elevation
+// level (driven by the slider/spin box beneath the picker).
 class MovementPermissionsSelector: public SelectablePixmapItem {
     Q_OBJECT
 public:
@@ -12,10 +20,18 @@ public:
         setAcceptHoverEvents(true);
     }
     void draw();
-    uint16_t getSelectedCollision();
-    uint16_t getSelectedElevation();
-    void select(uint16_t collision, uint16_t elevation);
+
+    // Generic single-cell selection (column x, row y). Used by the Locations tab.
+    void select(uint16_t x, uint16_t y);
     void setBasePixmap(QPixmap pixmap);
+
+    // Collision tab: the selector as a single elevation value.
+    uint16_t selectedValue() const;            // the value that will be painted
+    int selectedLevel() const { return m_level; } // user-facing level (value - FirstLevel)
+    bool isLevelCellSelected() const;          // is the "all levels" cell selected?
+    void setSelectedValue(uint16_t value);     // select the cell/level matching a value
+    void setElevationLevel(int level);         // set the "all levels" level, re-evaluate value
+    static int maxElevationLevel();            // Block::getMaxElevation() - FirstLevel
 
     static const int CellWidth;
     static const int CellHeight;
@@ -25,11 +41,13 @@ protected:
     void hoverLeaveEvent(QGraphicsSceneHoverEvent*);
 
 private:
-    void setSelectedMovementPermissions(QPointF);
+    uint16_t valueAt(int cell) const;
     QPixmap basePixmap;
+    int m_level = 0; // user-facing elevation level for the "all levels" cell
 
 signals:
-    void hoveredMovementPermissionChanged(uint16_t, uint16_t);
+    void selectedValueChanged(uint16_t value);
+    void hoveredMovementPermissionChanged(uint16_t value);
     void hoveredMovementPermissionCleared();
 };
 

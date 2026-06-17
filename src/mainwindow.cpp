@@ -1512,8 +1512,10 @@ bool MainWindow::setProjectUI() {
     this->editor->setPlayerViewRect(QRectF(QPoint(0,0), Metatile::pixelSize()).marginsAdded(projectConfig.playerViewDistance));
 
     editor->setCollisionGraphics();
-    ui->spinBox_SelectedElevation->setMaximum(Block::getMaxElevation());
-    ui->spinBox_SelectedCollision->setMaximum(Block::getMaxCollision());
+    // The elevation-level controls cover the ordinary elevation levels (values
+    // Elevation::FirstLevel and up), displayed as level 0..(maxElevation - FirstLevel).
+    ui->spinBox_SelectedElevation->setMaximum(MovementPermissionsSelector::maxElevationLevel());
+    ui->horizontalSlider_CollisionLevel->setMaximum(MovementPermissionsSelector::maxElevationLevel());
     editor->setLocationGraphics();
     ui->spinBox_SelectedLocation->setMaximum(Block::getMaxLocation());
 
@@ -3445,14 +3447,20 @@ void MainWindow::on_horizontalSlider_LocationZoom_valueChanged(int value) {
     ui->scrollAreaWidgetContents_Location->adjustSize();
 }
 
-void MainWindow::on_spinBox_SelectedCollision_valueChanged(int collision) {
+// The elevation-level spin box and slider both set the "all levels" elevation level on the
+// selector (which moves the picker selection to the all-levels cell). They mirror each other.
+void MainWindow::on_spinBox_SelectedElevation_valueChanged(int level) {
+    const QSignalBlocker blocker(ui->horizontalSlider_CollisionLevel);
+    ui->horizontalSlider_CollisionLevel->setValue(level);
     if (this->editor && this->editor->movement_permissions_selector_item)
-        this->editor->movement_permissions_selector_item->select(collision, ui->spinBox_SelectedElevation->value());
+        this->editor->movement_permissions_selector_item->setElevationLevel(level);
 }
 
-void MainWindow::on_spinBox_SelectedElevation_valueChanged(int elevation) {
+void MainWindow::on_horizontalSlider_CollisionLevel_valueChanged(int level) {
+    const QSignalBlocker blocker(ui->spinBox_SelectedElevation);
+    ui->spinBox_SelectedElevation->setValue(level);
     if (this->editor && this->editor->movement_permissions_selector_item)
-        this->editor->movement_permissions_selector_item->select(ui->spinBox_SelectedCollision->value(), elevation);
+        this->editor->movement_permissions_selector_item->setElevationLevel(level);
 }
 
 void MainWindow::on_spinBox_SelectedLocation_valueChanged(int location) {

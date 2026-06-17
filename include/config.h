@@ -310,7 +310,7 @@ public:
         this->usePoryScript = false;
         this->tripleLayerMetatilesEnabled = false;
         this->defaultMetatileId = 1;
-        this->defaultElevation = 3;
+        this->defaultElevation = 5;
         this->defaultCollision = 0;
         this->defaultMapSize = QSize(20,20);
         this->defaultPrimaryTileset = "gTileset_General";
@@ -325,14 +325,18 @@ public:
         this->pokemonIconPaths.clear();
         this->eventsTabIconPath = QString();
         this->collisionSheetPath = QString();
-        this->collisionSheetSize = QSize(2, 16);
+        this->collisionSheetSize = QSize(5, 1);
         this->playerViewDistance = QMargins(GBA_H_DIST_TO_CENTER, GBA_V_DIST_TO_CENTER, GBA_H_DIST_TO_CENTER, GBA_V_DIST_TO_CENTER);
         // Split metatile-id/attributes format: the map.bin word packs metatile id
-        // (bits 0-9), location (bits 10-11) and biome (bits 12-15), while collision
-        // (bit 0) and elevation (bits 1-7) live in a separate per-tile attribute byte.
+        // (bits 0-9), location (bits 10-11) and biome (bits 12-15). The per-tile attribute
+        // byte holds a single elevation value (bits 0-6); there is no collision bit, so the
+        // collision mask is empty. Special elevation values give a tile its movement
+        // semantics: 0 = elevation change, 1 = impassable, 2 = water, 3 = multi-level,
+        // 4+ = ordinary elevation levels. (Engine bit 7 is a runtime-only collision flag,
+        // never present in committed data.)
         this->blockMetatileIdMask = 0x03FF;
-        this->blockCollisionMask = 0x01;
-        this->blockElevationMask = 0xFE;
+        this->blockCollisionMask = 0x00;
+        this->blockElevationMask = 0x7F;
         this->blockLocationMask = 0x0C00;
         this->blockBiomeMask = 0xF000;
         this->unusedTileNormal = 0x3014;

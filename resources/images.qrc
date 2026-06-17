@@ -99,6 +99,7 @@
         <file>images/blank_tileset.png</file>
         <file>images/collisions.png</file>
         <file>images/collisions_unknown.png</file>
+        <file>images/elevation_tile.png</file>
         <file>images/locations.png</file>
         <file>images/locations_oob.png</file>
         <file>images/location_tileset_error.png</file>
