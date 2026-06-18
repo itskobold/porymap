@@ -61,6 +61,12 @@ signals:
     // active location tab changes or the active tab's secondary tileset is edited.
     void activeLocationTilesetChanged(const QString &tileset);
 
+    // Emitted only when the user switches the map to a different, known biome group (never
+    // on a programmatic/load update). The consumer is responsible for handling the side
+    // effects of the change (e.g. resetting the map's now-invalid per-group biome data),
+    // and may revert by setting the header's biome group back to oldGroup.
+    void biomeGroupEdited(const QString &oldGroup, const QString &newGroup);
+
 private:
     // The set of widgets that make up a single location tab.
     struct LocationTab {
@@ -81,6 +87,9 @@ private:
     // True while we're pushing data into the widgets, so the widgets' change handlers
     // can ignore the resulting signals instead of writing back to the header.
     bool m_updating = false;
+    // The biome group currently committed to the header, tracked so biomeGroupEdited can
+    // report the previous value (for revert) and so we only emit on an actual change.
+    QString m_biomeGroup;
     std::array<LocationTab, MAX_MAP_LOCATIONS> m_tabs;
 
     void createLocationTabs();

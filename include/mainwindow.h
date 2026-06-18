@@ -394,6 +394,7 @@ private:
     void refreshLocationSelector();
     void refreshBiomeSelector();
     void updateBiomeGraphics();
+    void onBiomeGroupEdited(const QString &oldGroup, const QString &newGroup);
     void setLayoutOnlyMode(bool layoutOnly);
 
     bool isInvalidProject(Project *project);

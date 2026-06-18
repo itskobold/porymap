@@ -212,6 +212,11 @@ public:
     // (BIOME_GROUP_*), which determines how many biomes are paintable and their graphics.
     void setBiomeGraphics(const QString &biomeGroup);
     int biomeCount() const { return m_biomeCount; }
+    // True if any tile in the current layout has a non-zero biome value.
+    bool layoutHasBiomeData() const;
+    // Resets every tile's biome to 0 (BIOME_NONE) and redraws the biome overlay. Used when
+    // the map's biome group changes, since the per-group relative biome ids no longer apply.
+    void clearMapBiomeData();
 
     enum ZValue {
         MapBorder = -4,

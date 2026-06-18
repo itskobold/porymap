@@ -261,6 +261,7 @@ void MapHeaderForm::refreshMapWideFields(const MapHeader &header) {
     ui->spinBox_MapGridX->setValue(header.mapGridX());
     ui->spinBox_MapGridY->setValue(header.mapGridY());
     setText(ui->comboBox_BiomeGroup, header.biomeGroup());
+    m_biomeGroup = header.biomeGroup();
     m_updating = prevUpdating;
 }
 
@@ -414,4 +415,16 @@ void MapHeaderForm::onAllowEscapingChanged(bool enabled) {           if (!m_upda
 void MapHeaderForm::onFloorNumberChanged(int offset) {               if (!m_updating && m_header) m_header->setFloorNumber(offset); }
 void MapHeaderForm::onMapGridXChanged(int pos) {                     if (!m_updating && m_header) m_header->setMapGridX(pos); }
 void MapHeaderForm::onMapGridYChanged(int pos) {                     if (!m_updating && m_header) m_header->setMapGridY(pos); }
-void MapHeaderForm::onBiomeGroupChanged(const QString &biomeGroup) { if (!m_updating && m_header) m_header->setBiomeGroup(biomeGroup); }
+void MapHeaderForm::onBiomeGroupChanged(const QString &biomeGroup) {
+    if (m_updating || !m_header)
+        return;
+    const QString oldGroup = m_biomeGroup;
+    m_biomeGroup = biomeGroup;
+    m_header->setBiomeGroup(biomeGroup);
+    // Only a switch to a different, known biome group is treated as a user edit that should
+    // trigger the consumer's side effects. This avoids reacting to partial text while the
+    // (editable) combo box is being typed into.
+    const bool known = m_project && m_project->biomeGroupNames.contains(biomeGroup);
+    if (known && biomeGroup != oldGroup)
+        emit biomeGroupEdited(oldGroup, biomeGroup);
+}

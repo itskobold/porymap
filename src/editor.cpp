@@ -2642,6 +2642,12 @@ void Editor::setBiomeGraphics(const QString &biomeGroup) {
     if (this->biome_selector_item) {
         this->biome_selector_item->setBasePixmap(this->biomeSheetPixmap);
         this->biome_selector_item->select(0, 0);
+        // The number of biomes (and so the selector's height) changes with the biome group.
+        // An unset scene rect only ever grows to fit its items, so pin it to the new pixmap
+        // bounds; otherwise the view stays centred on the old (taller) rect and clicks map
+        // to the wrong row.
+        if (this->scene_biome_metatiles)
+            this->scene_biome_metatiles->setSceneRect(this->biome_selector_item->boundingRect());
     }
 
     qDeleteAll(biomeIcons);
@@ -2654,6 +2660,34 @@ void Editor::setBiomeGraphics(const QString &biomeGroup) {
         biomeIcons.append(new QImage(imgSheet.copy(0, biome * h, w, h)));
     }
 
+    if (this->biome_item)
+        this->biome_item->draw(true);
+}
+
+bool Editor::layoutHasBiomeData() const {
+    if (!this->layout)
+        return false;
+    for (const auto &block : this->layout->blockdata) {
+        if (block.biome() != 0)
+            return true;
+    }
+    return false;
+}
+
+void Editor::clearMapBiomeData() {
+    if (!this->layout)
+        return;
+    bool changed = false;
+    for (int i = 0; i < this->layout->blockdata.length(); i++) {
+        Block block = this->layout->blockdata.at(i);
+        if (block.biome() != 0) {
+            block.setBiome(0);
+            this->layout->blockdata.replace(i, block);
+            changed = true;
+        }
+    }
+    if (changed)
+        this->layout->hasUnsavedDataChanges = true;
     if (this->biome_item)
         this->biome_item->draw(true);
 }

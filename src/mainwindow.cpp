@@ -342,6 +342,7 @@ void MainWindow::initCustomUI() {
 
     // The map canvas renders using the secondary tileset of the active location tab.
     connect(this->mapHeaderForm, &MapHeaderForm::activeLocationTilesetChanged, this, &MainWindow::onActiveLocationTilesetChanged);
+    connect(this->mapHeaderForm, &MapHeaderForm::biomeGroupEdited, this, &MainWindow::onBiomeGroupEdited);
 
     // The tileset picker above the metatile selector chooses which tileset's metatiles
     // are shown (the primary tileset, or one of the map's per-location secondaries).
@@ -1360,6 +1361,28 @@ void MainWindow::updateBiomeGraphics() {
     editor->setBiomeGraphics(editor->map->header()->biomeGroup());
     ui->spinBox_SelectedBiome->setMaximum(qMax(0, editor->biomeCount() - 1));
     refreshBiomeSelector();
+}
+
+// The user changed the map's biome group in the Header tab. The per-group relative biome ids
+// painted onto the map no longer correspond to the new group, so offer to reset them. The
+// new group's biome tiles are loaded via updateBiomeGraphics (connected to biomeGroupChanged).
+void MainWindow::onBiomeGroupEdited(const QString &oldGroup, const QString &newGroup) {
+    Q_UNUSED(newGroup)
+    if (!editor || !editor->map)
+        return;
+
+    if (editor->layoutHasBiomeData()) {
+        const auto result = QMessageBox::question(this, tr("Change Biome Group"),
+            tr("Changing the biome group will reset all biome data in this map to BIOME_NONE.\n\nDo you want to continue?"),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (result != QMessageBox::Yes) {
+            // Revert; setting the header's biome group reloads the old group's biome tiles
+            // (via biomeGroupChanged -> updateBiomeGraphics) and restores the combo box.
+            editor->map->header()->setBiomeGroup(oldGroup);
+            return;
+        }
+        editor->clearMapBiomeData();
+    }
 }
 
 // Some events (like warps) have data that refers to an event on a different map.
