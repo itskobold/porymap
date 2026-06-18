@@ -49,6 +49,8 @@ void renderBlocks(Layout *layout, bool ignoreCache = false) {
     layout->collisionItem->draw(ignoreCache);
     if (layout->locationItem)
         layout->locationItem->draw(ignoreCache);
+    if (layout->biomeItem)
+        layout->biomeItem->draw(ignoreCache);
 }
 
 PaintMetatile::PaintMetatile(Layout *layout,

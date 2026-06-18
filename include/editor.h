@@ -23,6 +23,7 @@
 #include "currentselectedmetatilespixmapitem.h"
 #include "collisionpixmapitem.h"
 #include "locationpixmapitem.h"
+#include "biomepixmapitem.h"
 #include "layoutpixmapitem.h"
 #include "settings.h"
 #include "gridsettings.h"
@@ -75,11 +76,13 @@ public:
     void displayMapMetatiles();
     void displayMapMovementPermissions();
     void displayMapLocations();
+    void displayMapBiomes();
     void displayBorderMetatiles();
     void displayCurrentMetatilesSelection();
     void redrawCurrentMetatilesSelection();
     void displayMovementPermissionSelector();
     void displayLocationSelector();
+    void displayBiomeSelector();
     void displayMapEvents();
     void displayMapConnections();
     void displayMapBorder();
@@ -142,6 +145,7 @@ public:
     QGraphicsPathItem *connection_mask = nullptr;
     QPointer<CollisionPixmapItem> collision_item = nullptr;
     QPointer<LocationPixmapItem> location_item = nullptr;
+    QPointer<BiomePixmapItem> biome_item = nullptr;
     QGraphicsItemGroup *events_group = nullptr;
 
     QList<QGraphicsPixmapItem*> borderItems;
@@ -156,12 +160,14 @@ public:
     QPointer<QGraphicsScene> scene_selected_border_metatiles = nullptr;
     QPointer<QGraphicsScene> scene_collision_metatiles = nullptr;
     QPointer<QGraphicsScene> scene_location_metatiles = nullptr;
+    QPointer<QGraphicsScene> scene_biome_metatiles = nullptr;
     QPointer<MetatileSelector> metatile_selector_item = nullptr;
 
     QPointer<BorderMetatilesPixmapItem> selected_border_metatiles_item = nullptr;
     CurrentSelectedMetatilesPixmapItem *current_metatile_selection_item = nullptr;
     QPointer<MovementPermissionsSelector> movement_permissions_selector_item = nullptr;
     QPointer<MovementPermissionsSelector> location_selector_item = nullptr;
+    QPointer<MovementPermissionsSelector> biome_selector_item = nullptr;
 
     QList<Event*> selectedEvents;
     QPointer<ConnectionPixmapItem> selected_connection_item = nullptr;
@@ -173,7 +179,7 @@ public:
     EditAction getMapEditAction() const { return this->mapEditAction; }
     EditAction getEventEditAction() const { return this->eventEditAction; }
 
-    enum class EditMode { None, Disabled, Metatiles, Collision, Locations, Header, Events, Connections, Encounters };
+    enum class EditMode { None, Disabled, Metatiles, Collision, Locations, Biome, Header, Events, Connections, Encounters };
     void setEditMode(EditMode editMode);
     EditMode getEditMode() const { return this->editMode; }
 
@@ -184,9 +190,11 @@ public:
     int scaleIndex = 2;
     qreal collisionOpacity = 0.5;
     qreal locationOpacity = 0.5;
+    qreal biomeOpacity = 0.5;
     static QList<const QImage*> collisionIcons;
     static QList<const QImage*> locationIcons;
     static QList<const QImage*> locationOobIcons;
+    static QList<const QImage*> biomeIcons;
 
     int eventShiftActionId = 0;
     int eventMoveActionId = 0;
@@ -200,6 +208,10 @@ public:
     void setCollisionGraphics();
     void setLocationGraphics();
     void updateLocationLimit();
+    // Rebuilds the biome selector + per-value biome icons for the given biome group
+    // (BIOME_GROUP_*), which determines how many biomes are paintable and their graphics.
+    void setBiomeGraphics(const QString &biomeGroup);
+    int biomeCount() const { return m_biomeCount; }
 
     enum ZValue {
         MapBorder = -4,
@@ -239,6 +251,14 @@ private:
     const QImage defaultLocationOobImgSheet = QImage(":/images/locations_oob.png");
     QPixmap locationSheetPixmap;
 
+    // Per biome group (BIOME_GROUP_*) sheet of stacked 16x16 biome icons. The number of
+    // rows is the number of biomes paintable for that group.
+    const QImage biomeImgSheetOverworld = QImage(":/images/biomes_overworld.png");
+    const QImage biomeImgSheetCave = QImage(":/images/biomes_cave.png");
+    const QImage biomeImgSheetUnderwater = QImage(":/images/biomes_underwater.png");
+    QPixmap biomeSheetPixmap;
+    int m_biomeCount = 1;
+
     EditMode editMode = EditMode::None;
 
     EditAction mapEditAction = EditAction::Paint;
@@ -249,9 +269,11 @@ private:
     void clearMetatileSelector();
     void clearMovementPermissionSelector();
     void clearLocationSelector();
+    void clearBiomeSelector();
     void clearMapMetatiles();
     void clearMapMovementPermissions();
     void clearMapLocations();
+    void clearMapBiomes();
     void clearBorderMetatiles();
     void clearCurrentMetatilesSelection();
     void clearMapEvents();
@@ -273,6 +295,7 @@ private:
     QString getMetatileDisplayMessage(uint16_t metatileId);
     void setCollisionTabElevationLevel(uint16_t value);
     void setLocationTabSpinBoxes(uint16_t location);
+    void setBiomeTabSpinBoxes(uint16_t biome);
     void adjustStraightPathPos(QGraphicsSceneMouseEvent *event, LayoutPixmapItem *item, QPoint *pos) const;
     static bool startDetachedProcess(const QString &command,
                                     const QString &workingDirectory = QString(),

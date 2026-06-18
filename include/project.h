@@ -47,6 +47,7 @@ public:
     QStringList mapTypes;
     QStringList mapBattleScenes;
     QStringList weatherNames;
+    QStringList biomeGroupNames;
     QStringList coordEventWeatherNames;
     QStringList secretBaseIds;
     QStringList bgEventFacingDirections;
@@ -197,6 +198,7 @@ public:
     bool readMapTypes();
     bool readMapBattleScenes();
     bool readWeatherNames();
+    bool readBiomeGroupNames();
     bool readCoordEventWeatherNames();
     bool readSecretBaseIds();
     bool readBgEventFacingDirections();

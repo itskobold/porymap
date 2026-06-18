@@ -2,8 +2,9 @@
 
 MapHeader::MapHeader(const MapHeader& other) : MapHeader() {
     m_locations = other.m_locations;
-    m_xPos = other.m_xPos;
-    m_yPos = other.m_yPos;
+    m_mapGridX = other.m_mapGridX;
+    m_mapGridY = other.m_mapGridY;
+    m_biomeGroup = other.m_biomeGroup;
     m_requiresFlash = other.m_requiresFlash;
     m_weather = other.m_weather;
     m_allowsRunning = other.m_allowsRunning;
@@ -19,8 +20,9 @@ MapHeader &MapHeader::operator=(const MapHeader &other) {
     // repeatedly (but for now at least that's not a big issue).
     for (int i = 0; i < MAX_MAP_LOCATIONS; i++)
         setLocationData(i, other.m_locations[i]);
-    setXPosition(other.m_xPos);
-    setYPosition(other.m_yPos);
+    setMapGridX(other.m_mapGridX);
+    setMapGridY(other.m_mapGridY);
+    setBiomeGroup(other.m_biomeGroup);
     setRequiresFlash(other.m_requiresFlash);
     setWeather(other.m_weather);
     setAllowsRunning(other.m_allowsRunning);
@@ -107,19 +109,27 @@ void MapHeader::setLocationData(int i, const LocationData &data) {
     setShowsLocationName(i, data.showsLocationName);
 }
 
-void MapHeader::setXPosition(int pos) {
-    if (m_xPos == pos)
+void MapHeader::setMapGridX(int pos) {
+    if (m_mapGridX == pos)
         return;
-    m_xPos = pos;
-    emit xPosChanged(m_xPos);
+    m_mapGridX = pos;
+    emit mapGridXChanged(m_mapGridX);
     emit modified();
 }
 
-void MapHeader::setYPosition(int pos) {
-    if (m_yPos == pos)
+void MapHeader::setMapGridY(int pos) {
+    if (m_mapGridY == pos)
         return;
-    m_yPos = pos;
-    emit yPosChanged(m_yPos);
+    m_mapGridY = pos;
+    emit mapGridYChanged(m_mapGridY);
+    emit modified();
+}
+
+void MapHeader::setBiomeGroup(const QString &biomeGroup) {
+    if (m_biomeGroup == biomeGroup)
+        return;
+    m_biomeGroup = biomeGroup;
+    emit biomeGroupChanged(m_biomeGroup);
     emit modified();
 }
 

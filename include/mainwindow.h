@@ -295,6 +295,7 @@ private slots:
     void on_spinBox_SelectedElevation_valueChanged(int level);
     void on_horizontalSlider_CollisionLevel_valueChanged(int level);
     void on_spinBox_SelectedLocation_valueChanged(int location);
+    void on_spinBox_SelectedBiome_valueChanged(int biome);
     void on_spinBox_SelectedNumLocations_valueChanged(int numLocations);
     void onActiveLocationTilesetChanged(const QString &tilesetLabel);
     void onTilesetSelectorTabChanged(int index);
@@ -302,6 +303,8 @@ private slots:
     void applyTilesetSelectorTab(int index);
     void on_horizontalSlider_LocationTransparency_valueChanged(int value);
     void on_horizontalSlider_LocationZoom_valueChanged(int value);
+    void on_horizontalSlider_BiomeTransparency_valueChanged(int value);
+    void on_horizontalSlider_BiomeZoom_valueChanged(int value);
     void on_actionRegion_Map_Editor_triggered();
     void on_actionPreferences_triggered();
     void on_actionOpen_Manual_triggered();
@@ -389,6 +392,8 @@ private:
     void refreshMetatileViews();
     void refreshCollisionSelector();
     void refreshLocationSelector();
+    void refreshBiomeSelector();
+    void updateBiomeGraphics();
     void setLayoutOnlyMode(bool layoutOnly);
 
     bool isInvalidProject(Project *project);
@@ -502,6 +507,7 @@ struct MapViewTab {
         Metatiles,
         Collision,
         Locations,
+        Biome,
         Prefabs,
     };
 };

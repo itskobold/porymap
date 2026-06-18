@@ -1326,6 +1326,9 @@ void MainWindow::refreshMapScene() {
     ui->graphicsView_LocationSelector->setScene(editor->scene_location_metatiles);
     ui->graphicsView_LocationSelector->setFixedSize(editor->location_selector_item->pixmap().width() + 2, editor->location_selector_item->pixmap().height() + 2);
 
+    ui->graphicsView_BiomeSelector->setScene(editor->scene_biome_metatiles);
+    ui->graphicsView_BiomeSelector->setFixedSize(editor->biome_selector_item->pixmap().width() + 2, editor->biome_selector_item->pixmap().height() + 2);
+
     // The metatile selector item is recreated on every redraw, resetting its display
     // section; rebuild the picker tabs and re-apply the selected section to the new item.
     refreshTilesetSelectorTabs();
@@ -1343,6 +1346,20 @@ void MainWindow::refreshCollisionSelector() {
 
 void MainWindow::refreshLocationSelector() {
     on_horizontalSlider_LocationZoom_valueChanged(ui->horizontalSlider_LocationZoom->value());
+}
+
+void MainWindow::refreshBiomeSelector() {
+    on_horizontalSlider_BiomeZoom_valueChanged(ui->horizontalSlider_BiomeZoom->value());
+}
+
+// Rebuild the biome selector and per-value biome icons for the active map's biome group,
+// and resize the Biome spin box's range to the number of biomes that group allows.
+void MainWindow::updateBiomeGraphics() {
+    if (!editor || !editor->map)
+        return;
+    editor->setBiomeGraphics(editor->map->header()->biomeGroup());
+    ui->spinBox_SelectedBiome->setMaximum(qMax(0, editor->biomeCount() - 1));
+    refreshBiomeSelector();
 }
 
 // Some events (like warps) have data that refers to an event on a different map.
@@ -1429,6 +1446,11 @@ void MainWindow::displayMapProperties() {
     // this runs on every map load.
     connect(header, &MapHeader::numLocationsChanged, this, &MainWindow::refreshTilesetEditorLocations, Qt::UniqueConnection);
     connect(header, &MapHeader::locationDataChanged, this, &MainWindow::refreshTilesetEditorLocations, Qt::UniqueConnection);
+
+    // The number/graphics of paintable biomes depends on the map's biome group, so refresh
+    // them now and whenever the biome group changes.
+    connect(header, &MapHeader::biomeGroupChanged, this, &MainWindow::updateBiomeGraphics, Qt::UniqueConnection);
+    updateBiomeGraphics();
 
     ui->mapCustomAttributesFrame->table()->setAttributes(editor->map->customAttributes());
 }
@@ -1518,6 +1540,10 @@ bool MainWindow::setProjectUI() {
     ui->horizontalSlider_CollisionLevel->setMaximum(MovementPermissionsSelector::maxElevationLevel());
     editor->setLocationGraphics();
     ui->spinBox_SelectedLocation->setMaximum(Block::getMaxLocation());
+    // Default biome graphics (BIOME_GROUP_NONE); refreshed per-map in displayMapProperties
+    // once the active map's biome group is known.
+    editor->setBiomeGraphics(QString());
+    ui->spinBox_SelectedBiome->setMaximum(qMax(0, editor->biomeCount() - 1));
 
     // map models
     this->mapGroupModel = new MapGroupModel(editor->project);
@@ -2346,6 +2372,7 @@ void MainWindow::on_mapViewTab_tabBarClicked(int index)
         {MapViewTab::Metatiles, Editor::EditMode::Metatiles},
         {MapViewTab::Collision, Editor::EditMode::Collision},
         {MapViewTab::Locations, Editor::EditMode::Locations},
+        {MapViewTab::Biome,     Editor::EditMode::Biome},
         {MapViewTab::Prefabs,   Editor::EditMode::Metatiles},
     };
     if (tabIndexToEditMode.contains(index)) {
@@ -2358,6 +2385,8 @@ void MainWindow::on_mapViewTab_tabBarClicked(int index)
         refreshCollisionSelector();
     } else if (index == MapViewTab::Locations) {
         refreshLocationSelector();
+    } else if (index == MapViewTab::Biome) {
+        refreshBiomeSelector();
     } else if (index == MapViewTab::Prefabs) {
         if (projectConfig.prefabFilepath.isEmpty() && !projectConfig.prefabImportPrompted) {
             // User hasn't set up prefabs and hasn't been prompted before.
@@ -2793,6 +2822,12 @@ void MainWindow::on_horizontalSlider_LocationTransparency_valueChanged(int value
     this->editor->locationOpacity = static_cast<qreal>(value) / 100;
     if (this->editor->location_item)
         this->editor->location_item->draw(true);
+}
+
+void MainWindow::on_horizontalSlider_BiomeTransparency_valueChanged(int value) {
+    this->editor->biomeOpacity = static_cast<qreal>(value) / 100;
+    if (this->editor->biome_item)
+        this->editor->biome_item->draw(true);
 }
 
 void MainWindow::on_actionPencil_triggered()     { on_toolButton_Paint_clicked(); }
@@ -3447,6 +3482,23 @@ void MainWindow::on_horizontalSlider_LocationZoom_valueChanged(int value) {
     ui->scrollAreaWidgetContents_Location->adjustSize();
 }
 
+void MainWindow::on_horizontalSlider_BiomeZoom_valueChanged(int value) {
+    if (!editor->biome_selector_item)
+        return;
+    double scale = pow(3.0, static_cast<double>(value - 30) / 30.0);
+
+    QTransform transform;
+    transform.scale(scale, scale);
+    QSize size(editor->biome_selector_item->pixmap().width(),
+               editor->biome_selector_item->pixmap().height());
+    size *= scale;
+
+    ui->graphicsView_BiomeSelector->setResizeAnchor(QGraphicsView::NoAnchor);
+    ui->graphicsView_BiomeSelector->setTransform(transform);
+    ui->graphicsView_BiomeSelector->setFixedSize(size.width() + 2, size.height() + 2);
+    ui->scrollAreaWidgetContents_Biome->adjustSize();
+}
+
 // The elevation-level spin box and slider both set the "all levels" elevation level on the
 // selector (which moves the picker selection to the all-levels cell). They mirror each other.
 void MainWindow::on_spinBox_SelectedElevation_valueChanged(int level) {
@@ -3466,6 +3518,11 @@ void MainWindow::on_horizontalSlider_CollisionLevel_valueChanged(int level) {
 void MainWindow::on_spinBox_SelectedLocation_valueChanged(int location) {
     if (this->editor && this->editor->location_selector_item)
         this->editor->location_selector_item->select(0, location);
+}
+
+void MainWindow::on_spinBox_SelectedBiome_valueChanged(int biome) {
+    if (this->editor && this->editor->biome_selector_item)
+        this->editor->biome_selector_item->select(0, biome);
 }
 
 void MainWindow::on_spinBox_SelectedNumLocations_valueChanged(int numLocations) {

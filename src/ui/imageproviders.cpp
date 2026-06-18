@@ -83,6 +83,15 @@ QImage getLocationOobMetatileImage(int location) {
     return image ? *image : QImage();
 }
 
+QImage getBiomeMetatileImage(Block block) {
+    return getBiomeMetatileImage(block.biome());
+}
+
+QImage getBiomeMetatileImage(int biome) {
+    const QImage * image = Editor::biomeIcons.value(biome);
+    return image ? *image : QImage();
+}
+
 QImage getMetatileImage(uint16_t metatileId, const Layout *layout, bool useTruePalettes) {
     Metatile* metatile = Tileset::getMetatile(metatileId,
                                               layout ? layout->tileset_primary : nullptr,

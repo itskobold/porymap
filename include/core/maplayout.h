@@ -15,6 +15,7 @@ class MapConnection;
 class LayoutPixmapItem;
 class CollisionPixmapItem;
 class LocationPixmapItem;
+class BiomePixmapItem;
 class BorderMetatilesPixmapItem;
 
 class Layout : public QObject {
@@ -67,11 +68,14 @@ public:
     QPixmap collision_pixmap;
     QImage location_image;
     QPixmap location_pixmap;
+    QImage biome_image;
+    QPixmap biome_pixmap;
 
     Blockdata border;
     Blockdata cached_blockdata;
     Blockdata cached_collision;
     Blockdata cached_location;
+    Blockdata cached_biome;
     Blockdata cached_border;
     struct {
         Blockdata blocks;
@@ -103,6 +107,7 @@ public:
     LayoutPixmapItem *layoutItem = nullptr;
     CollisionPixmapItem *collisionItem = nullptr;
     LocationPixmapItem *locationItem = nullptr;
+    BiomePixmapItem *biomeItem = nullptr;
     BorderMetatilesPixmapItem *borderItem = nullptr;
 
     // Tiles whose location value is >= this limit are drawn as "out of bounds" and
@@ -159,6 +164,7 @@ public:
     void cacheBlockdata();
     void cacheCollision();
     void cacheLocation();
+    void cacheBiome();
     void clearBorderCache();
     void cacheBorder();
 
@@ -185,9 +191,14 @@ public:
     void _floodFillLocation(int x, int y, uint16_t location);
     void magicFillLocation(int x, int y, uint16_t location);
 
+    void floodFillBiome(int x, int y, uint16_t biome);
+    void _floodFillBiome(int x, int y, uint16_t biome);
+    void magicFillBiome(int x, int y, uint16_t biome);
+
     QPixmap render(bool ignoreCache = false, Layout *fromLayout = nullptr, const QRect &bounds = QRect(0, 0, -1, -1));
     QPixmap renderCollision(bool ignoreCache);
     QPixmap renderLocation(bool ignoreCache);
+    QPixmap renderBiome(bool ignoreCache);
     QPixmap renderBorder(bool ignoreCache = false);
 
     QPixmap getLayoutItemPixmap();
@@ -195,6 +206,7 @@ public:
     void setLayoutItem(LayoutPixmapItem *item) { layoutItem = item; }
     void setCollisionItem(CollisionPixmapItem *item) { collisionItem = item; }
     void setLocationItem(LocationPixmapItem *item) { locationItem = item; }
+    void setBiomeItem(BiomePixmapItem *item) { biomeItem = item; }
     void setBorderItem(BorderMetatilesPixmapItem *item) { borderItem = item; }
 
     bool metatileIsValid(uint16_t metatileId) { return Tileset::metatileIsValid(metatileId, this->tileset_primary, this->tileset_secondary); }

@@ -23,6 +23,9 @@ MapHeaderForm::MapHeaderForm(QWidget *parent)
     connect(ui->checkBox_AllowBiking,   &QCheckBox::toggled, this, &MapHeaderForm::onAllowBikingChanged);
     connect(ui->checkBox_AllowEscaping, &QCheckBox::toggled, this, &MapHeaderForm::onAllowEscapingChanged);
     connect(ui->spinBox_FloorNumber, QOverload<int>::of(&QSpinBox::valueChanged), this, &MapHeaderForm::onFloorNumberChanged);
+    connect(ui->spinBox_MapGridX, QOverload<int>::of(&QSpinBox::valueChanged), this, &MapHeaderForm::onMapGridXChanged);
+    connect(ui->spinBox_MapGridY, QOverload<int>::of(&QSpinBox::valueChanged), this, &MapHeaderForm::onMapGridYChanged);
+    connect(ui->comboBox_BiomeGroup, &QComboBox::currentTextChanged, this, &MapHeaderForm::onBiomeGroupChanged);
 
     connect(ui->tabWidget_Locations, &QTabWidget::currentChanged, this, &MapHeaderForm::onCurrentTabChanged);
 }
@@ -135,6 +138,10 @@ void MapHeaderForm::populateComboBoxes() {
     ui->comboBox_Weather->clear();
     ui->comboBox_Weather->addItems(m_project->weatherNames);
 
+    const QSignalBlocker b_BiomeGroup(ui->comboBox_BiomeGroup);
+    ui->comboBox_BiomeGroup->clear();
+    ui->comboBox_BiomeGroup->addItems(m_project->biomeGroupNames);
+
     const QStringList locations = m_project->locationNames();
     for (auto &tab : m_tabs) {
         const QSignalBlocker b_Tileset(tab.comboBox_SecondaryTileset);
@@ -200,6 +207,9 @@ void MapHeaderForm::setHeader(MapHeader *header) {
     connect(m_header, &MapHeader::allowsBikingChanged,  this, [this]() { if (m_header) refreshMapWideFields(*m_header); });
     connect(m_header, &MapHeader::allowsEscapingChanged,this, [this]() { if (m_header) refreshMapWideFields(*m_header); });
     connect(m_header, &MapHeader::floorNumberChanged,   this, [this]() { if (m_header) refreshMapWideFields(*m_header); });
+    connect(m_header, &MapHeader::mapGridXChanged,      this, [this]() { if (m_header) refreshMapWideFields(*m_header); });
+    connect(m_header, &MapHeader::mapGridYChanged,      this, [this]() { if (m_header) refreshMapWideFields(*m_header); });
+    connect(m_header, &MapHeader::biomeGroupChanged,    this, [this]() { if (m_header) refreshMapWideFields(*m_header); });
 
     // Immediately update the UI to reflect the assigned MapHeader
     setHeaderData(*m_header);
@@ -248,6 +258,9 @@ void MapHeaderForm::refreshMapWideFields(const MapHeader &header) {
     ui->checkBox_AllowBiking->setChecked(header.allowsBiking());
     ui->checkBox_AllowEscaping->setChecked(header.allowsEscaping());
     ui->spinBox_FloorNumber->setValue(header.floorNumber());
+    ui->spinBox_MapGridX->setValue(header.mapGridX());
+    ui->spinBox_MapGridY->setValue(header.mapGridY());
+    setText(ui->comboBox_BiomeGroup, header.biomeGroup());
     m_updating = prevUpdating;
 }
 
@@ -302,6 +315,9 @@ MapHeader MapHeaderForm::headerData() const {
     header.setAllowsBiking(ui->checkBox_AllowBiking->isChecked());
     header.setAllowsEscaping(ui->checkBox_AllowEscaping->isChecked());
     header.setFloorNumber(ui->spinBox_FloorNumber->value());
+    header.setMapGridX(ui->spinBox_MapGridX->value());
+    header.setMapGridY(ui->spinBox_MapGridY->value());
+    header.setBiomeGroup(ui->comboBox_BiomeGroup->currentText());
     return header;
 }
 
@@ -396,3 +412,6 @@ void MapHeaderForm::onAllowRunningChanged(bool enabled) {            if (!m_upda
 void MapHeaderForm::onAllowBikingChanged(bool enabled) {             if (!m_updating && m_header) m_header->setAllowsBiking(enabled); }
 void MapHeaderForm::onAllowEscapingChanged(bool enabled) {           if (!m_updating && m_header) m_header->setAllowsEscaping(enabled); }
 void MapHeaderForm::onFloorNumberChanged(int offset) {               if (!m_updating && m_header) m_header->setFloorNumber(offset); }
+void MapHeaderForm::onMapGridXChanged(int pos) {                     if (!m_updating && m_header) m_header->setMapGridX(pos); }
+void MapHeaderForm::onMapGridYChanged(int pos) {                     if (!m_updating && m_header) m_header->setMapGridY(pos); }
+void MapHeaderForm::onBiomeGroupChanged(const QString &biomeGroup) { if (!m_updating && m_header) m_header->setBiomeGroup(biomeGroup); }

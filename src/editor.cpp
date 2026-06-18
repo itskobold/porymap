@@ -34,6 +34,9 @@ QList<const QImage*> Editor::locationIcons;
 // exceeds the current map's Num. Locations).
 QList<const QImage*> Editor::locationOobIcons;
 
+// Array mapping biome values to an icon. Rebuilt for the active map's biome group.
+QList<const QImage*> Editor::biomeIcons;
+
 Editor::Editor(Ui::MainWindow* ui)
 {
     this->ui = ui;
@@ -85,6 +88,7 @@ Editor::~Editor()
     qDeleteAll(collisionIcons);
     qDeleteAll(locationIcons);
     qDeleteAll(locationOobIcons);
+    qDeleteAll(biomeIcons);
 
     closeProject();
 }
@@ -136,7 +140,7 @@ void Editor::closeProject() {
 
 bool Editor::getEditingLayout() const {
     return this->editMode == EditMode::Metatiles || this->editMode == EditMode::Collision
-        || this->editMode == EditMode::Locations;
+        || this->editMode == EditMode::Locations || this->editMode == EditMode::Biome;
 }
 
 void Editor::setEditMode(EditMode editMode) {
@@ -145,12 +149,13 @@ void Editor::setEditMode(EditMode editMode) {
     auto oldEditMode = this->editMode;
     this->editMode = editMode;
 
-    if (!map_item || !collision_item || !location_item) return;
+    if (!map_item || !collision_item || !location_item || !biome_item) return;
     if (!this->layout) return;
 
     map_item->setVisible(true); // is map item ever not visible
     collision_item->setVisible(false);
     location_item->setVisible(false);
+    biome_item->setVisible(false);
 
     switch (this->editMode) {
     case EditMode::Metatiles:
@@ -164,6 +169,9 @@ void Editor::setEditMode(EditMode editMode) {
     case EditMode::Locations:
         current_view = location_item;
         break;
+    case EditMode::Biome:
+        current_view = biome_item;
+        break;
     default:
         current_view = nullptr;
         break;
@@ -172,6 +180,7 @@ void Editor::setEditMode(EditMode editMode) {
     map_item->draw();
     collision_item->draw();
     location_item->draw();
+    biome_item->draw();
 
     if (current_view) current_view->setVisible(true);
 
@@ -254,6 +263,8 @@ void Editor::setEditAction(EditAction editAction) {
                 this->collision_item->unsetCursor();
             if (this->location_item)
                 this->location_item->unsetCursor();
+            if (this->biome_item)
+                this->biome_item->unsetCursor();
         } else {
             auto cursor = cursors.value(editAction);
             if (this->map_item)
@@ -262,6 +273,8 @@ void Editor::setEditAction(EditAction editAction) {
                 this->collision_item->setCursor(cursor);
             if (this->location_item)
                 this->location_item->setCursor(cursor);
+            if (this->biome_item)
+                this->biome_item->setCursor(cursor);
         }
     }
     emit editActionSet(editAction);
@@ -1185,7 +1198,8 @@ void Editor::scaleMapView(int s) {
 
 bool Editor::isMouseInMap() const {
     return (this->map_item && this->map_item->has_mouse) || (this->collision_item && this->collision_item->has_mouse)
-        || (this->location_item && this->location_item->has_mouse);
+        || (this->location_item && this->location_item->has_mouse)
+        || (this->biome_item && this->biome_item->has_mouse);
 }
 
 void Editor::setPlayerViewRect(const QRectF &rect) {
@@ -1286,6 +1300,11 @@ void Editor::setStatusFromMapPos(const QPoint &pos) {
                               .arg(pos.x())
                               .arg(pos.y())
                               .arg(block.location()));
+    } else if (this->editMode == EditMode::Biome) {
+        this->ui->statusBar->showMessage(QString("X: %1, Y: %2, Biome: %3")
+                              .arg(pos.x())
+                              .arg(pos.y())
+                              .arg(block.biome()));
     } else if (this->editMode == EditMode::Events) {
         this->ui->statusBar->showMessage(QString("X: %1, Y: %2, Scale = %3x")
                               .arg(pos.x())
@@ -1481,7 +1500,7 @@ void Editor::mouseEvent_map(QGraphicsSceneMouseEvent *event, LayoutPixmapItem *i
 
     QPoint pos = Metatile::coordFromPixmapCoord(event->pos());
 
-    if (this->editMode == EditMode::Metatiles || this->editMode == EditMode::Collision || this->editMode == EditMode::Locations) {
+    if (this->editMode == EditMode::Metatiles || this->editMode == EditMode::Collision || this->editMode == EditMode::Locations || this->editMode == EditMode::Biome) {
         if (editAction == EditAction::Paint) {
             if (event->buttons() & Qt::RightButton) {
                 if (this->editMode == EditMode::Collision) {
@@ -1490,6 +1509,9 @@ void Editor::mouseEvent_map(QGraphicsSceneMouseEvent *event, LayoutPixmapItem *i
                 } else if (this->editMode == EditMode::Locations) {
                     auto locationItem = dynamic_cast<LocationPixmapItem*>(item);
                     if (locationItem) locationItem->updateLocationSelection(event);
+                } else if (this->editMode == EditMode::Biome) {
+                    auto biomeItem = dynamic_cast<BiomePixmapItem*>(item);
+                    if (biomeItem) biomeItem->updateBiomeSelection(event);
                 } else {
                     item->updateMetatileSelection(event);
                 }
@@ -1637,6 +1659,8 @@ bool Editor::displayLayout() {
     displayMapMovementPermissions();
     displayLocationSelector();
     displayMapLocations();
+    displayBiomeSelector();
+    displayMapBiomes();
     displayBorderMetatiles();
     displayCurrentMetatilesSelection();
     displayMapBorder();
@@ -1651,6 +1675,9 @@ bool Editor::displayLayout() {
     }
     if (location_item) {
         location_item->setVisible(false);
+    }
+    if (biome_item) {
+        biome_item->setVisible(false);
     }
 
     return true;
@@ -1751,6 +1778,27 @@ void Editor::displayMapLocations() {
 
     location_item->draw(true);
     scene->addItem(location_item);
+}
+
+void Editor::clearMapBiomes() {
+    if (biome_item && scene) {
+        scene->removeItem(biome_item);
+        delete biome_item;
+    }
+}
+
+void Editor::displayMapBiomes() {
+    clearMapBiomes();
+
+    biome_item = new BiomePixmapItem(this->layout, ui->spinBox_SelectedBiome,
+                                     this->metatile_selector_item, this->settings, &this->biomeOpacity);
+    connect(biome_item, &BiomePixmapItem::mouseEvent, this, &Editor::mouseEvent_map);
+    connect(biome_item, &BiomePixmapItem::hoverEntered, this, &Editor::onMapHoverEntered);
+    connect(biome_item, &BiomePixmapItem::hoverChanged, this, &Editor::onMapHoverChanged);
+    connect(biome_item, &BiomePixmapItem::hoverCleared, this, &Editor::onMapHoverCleared);
+
+    biome_item->draw(true);
+    scene->addItem(biome_item);
 }
 
 void Editor::clearBorderMetatiles() {
@@ -1855,6 +1903,30 @@ void Editor::displayLocationSelector() {
     }
 
     scene_location_metatiles->addItem(location_selector_item);
+}
+
+void Editor::clearBiomeSelector() {
+    if (biome_selector_item && biome_selector_item->scene()) {
+        biome_selector_item->scene()->removeItem(biome_selector_item);
+        delete scene_biome_metatiles;
+    }
+}
+
+void Editor::displayBiomeSelector() {
+    clearBiomeSelector();
+
+    scene_biome_metatiles = new QGraphicsScene;
+    if (!biome_selector_item) {
+        // Like the locations selector, the biome selector reuses the movement-permissions
+        // selector widget, treating the single-column biome sheet as a vertical strip of values.
+        biome_selector_item = new MovementPermissionsSelector(this->biomeSheetPixmap);
+        connect(biome_selector_item, &SelectablePixmapItem::selectionChanged, [this](const QPoint &pos, const QSize&) {
+            this->setBiomeTabSpinBoxes(pos.y());
+        });
+        biome_selector_item->select(0, 0);
+    }
+
+    scene_biome_metatiles->addItem(biome_selector_item);
 }
 
 void Editor::clearMapEvents() {
@@ -2533,6 +2605,57 @@ void Editor::setCollisionTabElevationLevel(uint16_t value) {
 void Editor::setLocationTabSpinBoxes(uint16_t location) {
     const QSignalBlocker blocker(ui->spinBox_SelectedLocation);
     ui->spinBox_SelectedLocation->setValue(location);
+}
+
+void Editor::setBiomeTabSpinBoxes(uint16_t biome) {
+    const QSignalBlocker blocker(ui->spinBox_SelectedBiome);
+    ui->spinBox_SelectedBiome->setValue(biome);
+}
+
+// Builds the biome selector pixmap and per-value biome icons for the given biome group
+// (BIOME_GROUP_*). The chosen sheet is a single column of 16x16 icons; its row count is the
+// number of biomes paintable for that group, which is why this is refreshed when the active
+// map's biome group changes.
+void Editor::setBiomeGraphics(const QString &biomeGroup) {
+    QImage imgSheet;
+    if (biomeGroup.endsWith("OVERWORLD")) {
+        imgSheet = this->biomeImgSheetOverworld;
+    } else if (biomeGroup.endsWith("UNDERWATER")) {
+        imgSheet = this->biomeImgSheetUnderwater;
+    } else if (biomeGroup.endsWith("CAVE")) {
+        imgSheet = this->biomeImgSheetCave;
+    }
+    // BIOME_GROUP_NONE (or any unrecognized group) has no paintable biomes. Fall back to a
+    // single transparent cell so the selector and the map overlay still have something valid.
+    if (imgSheet.isNull()) {
+        imgSheet = QImage(Metatile::pixelWidth(), Metatile::pixelHeight(), QImage::Format_RGBA8888);
+        imgSheet.fill(Qt::transparent);
+    }
+
+    // The sheet is a single column of square cells, so the number of biomes is its row count.
+    const int imgColumns = 1;
+    const int imgRows = imgSheet.width() ? (imgSheet.height() / imgSheet.width()) : 1;
+    m_biomeCount = qMax(1, imgRows);
+
+    this->biomeSheetPixmap = QPixmap::fromImage(imgSheet).scaled(MovementPermissionsSelector::CellWidth * imgColumns,
+                                                                 MovementPermissionsSelector::CellHeight * imgRows);
+    if (this->biome_selector_item) {
+        this->biome_selector_item->setBasePixmap(this->biomeSheetPixmap);
+        this->biome_selector_item->select(0, 0);
+    }
+
+    qDeleteAll(biomeIcons);
+    biomeIcons.clear();
+
+    // Create a 16x16 icon for each biome value from the sheet.
+    const int w = Metatile::pixelWidth(), h = Metatile::pixelHeight();
+    imgSheet = imgSheet.scaled(w * imgColumns, h * imgRows);
+    for (int biome = 0; biome < m_biomeCount; biome++) {
+        biomeIcons.append(new QImage(imgSheet.copy(0, biome * h, w, h)));
+    }
+
+    if (this->biome_item)
+        this->biome_item->draw(true);
 }
 
 // Builds the location selector pixmap and the per-value location icons from locations.png.

@@ -112,6 +112,9 @@ private:
     void onAllowBikingChanged(bool enabled);
     void onAllowEscapingChanged(bool enabled);
     void onFloorNumberChanged(int offset);
+    void onMapGridXChanged(int pos);
+    void onMapGridYChanged(int pos);
+    void onBiomeGroupChanged(const QString &biomeGroup);
 };
 
 #endif // MAPHEADERFORM_H

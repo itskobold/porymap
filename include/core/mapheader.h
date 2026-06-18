@@ -44,8 +44,9 @@ public:
 
     bool operator==(const MapHeader& other) const {
         return m_locations == other.m_locations
-        && m_xPos == other.m_xPos
-        && m_yPos == other.m_yPos
+        && m_mapGridX == other.m_mapGridX
+        && m_mapGridY == other.m_mapGridY
+        && m_biomeGroup == other.m_biomeGroup
         && m_requiresFlash == other.m_requiresFlash
         && m_weather == other.m_weather
         && m_allowsRunning == other.m_allowsRunning
@@ -99,8 +100,12 @@ public:
     bool showsLocationName() const   { return showsLocationName(0); }
 
     // Map-wide (non per-location) fields.
-    void setXPosition(int pos);
-    void setYPosition(int pos);
+    // Position of this map within the world map grid (mirrors mapGridX/mapGridY in the
+    // pokeemerald MapHeader). X can be 0-29 (5 bits), Y can be 0-15 (4 bits).
+    void setMapGridX(int pos);
+    void setMapGridY(int pos);
+    // Biome group define name, e.g. "BIOME_GROUP_OVERWORLD" (see constants/biome.h).
+    void setBiomeGroup(const QString &biomeGroup);
     void setRequiresFlash(bool requiresFlash);
     void setWeather(const QString &weather);
     void setAllowsRunning(bool allowsRunning);
@@ -109,8 +114,9 @@ public:
     void setFloorNumber(int floorNumber);
     void setNumLocations(int numLocations);
 
-    int xPos() const { return m_xPos; }
-    int yPos() const { return m_yPos; }
+    int mapGridX() const { return m_mapGridX; }
+    int mapGridY() const { return m_mapGridY; }
+    QString biomeGroup() const { return m_biomeGroup; }
     bool requiresFlash() const { return m_requiresFlash; }
     QString weather() const { return m_weather; }
     bool allowsRunning() const { return m_allowsRunning; }
@@ -130,8 +136,9 @@ signals:
     void showsLocationNameChanged(bool);
     void secondaryTilesetChanged(QString);
 
-    void xPosChanged(int);
-    void yPosChanged(int);
+    void mapGridXChanged(int);
+    void mapGridYChanged(int);
+    void biomeGroupChanged(QString);
     void requiresFlashChanged(bool);
     void weatherChanged(QString);
     void allowsRunningChanged(bool);
@@ -143,8 +150,9 @@ signals:
 
 private:
     std::array<LocationData, MAX_MAP_LOCATIONS> m_locations = {};
-    int m_xPos = 0;
-    int m_yPos = 0;
+    int m_mapGridX = 0;
+    int m_mapGridY = 0;
+    QString m_biomeGroup;
     bool m_requiresFlash = false;
     QString m_weather;
     bool m_allowsRunning = false;

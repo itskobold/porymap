@@ -201,6 +201,7 @@ bool Project::load() {
                 && readMapTypes()
                 && readMapBattleScenes()
                 && readWeatherNames()
+                && readBiomeGroupNames()
                 && readCoordEventWeatherNames()
                 && readSecretBaseIds() 
                 && readBgEventFacingDirections()
@@ -356,6 +357,9 @@ QSet<QString> Project::getTopLevelMapFields() const {
         "requires_flash",
         "weather",
         "num_locations",
+        "map_grid_x",
+        "map_grid_y",
+        "biome_group",
         "locations",
         "connections",
         Event::groupToJsonKey(Event::Group::Object),
@@ -471,6 +475,12 @@ bool Project::loadMapData(Map* map) {
     // Number of per-tile location values used by this map (1-4). Absent in older maps; default to 1.
     if (mapObj.contains("num_locations"))
         map->header()->setNumLocations(ParseUtil::jsonToInt(mapObj.take("num_locations")));
+
+    // World map grid position and biome group (mirrors mapGridX/mapGridY/biomeGroup in the
+    // pokeemerald MapHeader). Absent in older maps; default to 0 / BIOME_GROUP_NONE.
+    map->header()->setMapGridX(ParseUtil::jsonToInt(mapObj.take("map_grid_x")));
+    map->header()->setMapGridY(ParseUtil::jsonToInt(mapObj.take("map_grid_y")));
+    map->header()->setBiomeGroup(ParseUtil::jsonToQString(mapObj.take("biome_group")));
 
     if (projectConfig.mapAllowFlagsEnabled) {
         map->header()->setAllowsBiking(ParseUtil::jsonToBool(mapObj.take("allow_cycling")));
@@ -1430,6 +1440,9 @@ bool Project::saveMap(Map *map, bool skipLayout) {
         mapObj["floor_number"] = map->header()->floorNumber();
     }
     mapObj["num_locations"] = map->header()->numLocations();
+    mapObj["map_grid_x"] = map->header()->mapGridX();
+    mapObj["map_grid_y"] = map->header()->mapGridY();
+    mapObj["biome_group"] = map->header()->biomeGroup();
 
     // Per-location header data (mirrors struct MapHeaderLocationData in pokeemerald).
     // We always write all MAX_MAP_LOCATIONS sets so they're available for editing;
@@ -2328,6 +2341,9 @@ void Project::initNewMapSettings() {
         this->newMapSettings.header.setLocationData(i, defaultLocation);
     this->newMapSettings.header.setRequiresFlash(false);
     this->newMapSettings.header.setWeather(this->weatherNames.value(0, "0"));
+    this->newMapSettings.header.setMapGridX(0);
+    this->newMapSettings.header.setMapGridY(0);
+    this->newMapSettings.header.setBiomeGroup(this->biomeGroupNames.value(0, "BIOME_GROUP_NONE"));
     this->newMapSettings.header.setAllowsRunning(false);
     this->newMapSettings.header.setAllowsBiking(false);
     this->newMapSettings.header.setAllowsEscaping(false);
@@ -2946,6 +2962,16 @@ bool Project::readWeatherNames() {
     this->weatherNames = parser.readCDefineNames(filename, {projectConfig.getIdentifier(ProjectIdentifier::regex_weather)}, &error);
     if (!error.isEmpty())
         logWarn(QString("Failed to read weather constants from '%1': %2").arg(filename).arg(error));
+    return true;
+}
+
+bool Project::readBiomeGroupNames() {
+    const QString filename = projectConfig.getFilePath(ProjectFilePath::constants_biome);
+    watchFile(filename);
+    QString error;
+    this->biomeGroupNames = parser.readCDefineNames(filename, {projectConfig.getIdentifier(ProjectIdentifier::regex_biome_groups)}, &error);
+    if (!error.isEmpty())
+        logWarn(QString("Failed to read biome group constants from '%1': %2").arg(filename).arg(error));
     return true;
 }
 

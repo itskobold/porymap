@@ -256,6 +256,12 @@ void Layout::cacheLocation() {
         this->cached_location.append(block);
 }
 
+void Layout::cacheBiome() {
+    this->cached_biome.clear();
+    for (const auto &block : this->blockdata)
+        this->cached_biome.append(block);
+}
+
 bool Layout::layoutBlockChanged(int i, const Blockdata &curData, const Blockdata &cache) {
     if (cache.length() <= i)
         return true;
@@ -510,6 +516,65 @@ void Layout::magicFillLocation(int initialX, int initialY, uint16_t location) {
     }
 }
 
+// The biome field is independent of the metatile/tileset, so (unlike location) biome fills
+// can repaint any tile.
+void Layout::_floodFillBiome(int x, int y, uint16_t biome) {
+    QList<QPoint> todo;
+    todo.append(QPoint(x, y));
+    while (todo.length()) {
+        QPoint point = todo.takeAt(0);
+        x = point.x();
+        y = point.y();
+        Block block;
+        if (!getBlock(x, y, &block)) {
+            continue;
+        }
+
+        uint old_biome = block.biome();
+        if (old_biome == biome) {
+            continue;
+        }
+
+        block.setBiome(biome);
+        setBlock(x, y, block, true);
+        if (getBlock(x + 1, y, &block) && block.biome() == old_biome) {
+            todo.append(QPoint(x + 1, y));
+        }
+        if (getBlock(x - 1, y, &block) && block.biome() == old_biome) {
+            todo.append(QPoint(x - 1, y));
+        }
+        if (getBlock(x, y + 1, &block) && block.biome() == old_biome) {
+            todo.append(QPoint(x, y + 1));
+        }
+        if (getBlock(x, y - 1, &block) && block.biome() == old_biome) {
+            todo.append(QPoint(x, y - 1));
+        }
+    }
+}
+
+void Layout::floodFillBiome(int x, int y, uint16_t biome) {
+    Block block;
+    if (getBlock(x, y, &block) && block.biome() != biome) {
+        _floodFillBiome(x, y, biome);
+    }
+}
+
+void Layout::magicFillBiome(int initialX, int initialY, uint16_t biome) {
+    Block block;
+    if (getBlock(initialX, initialY, &block) && block.biome() != biome) {
+        uint old_biome = block.biome();
+
+        for (int y = 0; y < getHeight(); y++) {
+            for (int x = 0; x < getWidth(); x++) {
+                if (getBlock(x, y, &block) && block.biome() == old_biome) {
+                    block.setBiome(biome);
+                    setBlock(x, y, block, true);
+                }
+            }
+        }
+    }
+}
+
 QPixmap Layout::render(bool ignoreCache, Layout *fromLayout, const QRect &bounds) {
     bool changed_any = false;
     if (this->image.isNull() || this->image.width() != pixelWidth() || this->image.height() != pixelHeight()) {
@@ -634,6 +699,39 @@ QPixmap Layout::renderLocation(bool ignoreCache) {
         location_pixmap = location_pixmap.fromImage(location_image);
     }
     return location_pixmap;
+}
+
+QPixmap Layout::renderBiome(bool ignoreCache) {
+    bool changed_any = false;
+    if (biome_image.isNull() || biome_image.width() != pixelWidth() || biome_image.height() != pixelHeight()) {
+        biome_image = QImage(pixelWidth(), pixelHeight(), QImage::Format_RGBA8888);
+        changed_any = true;
+    }
+    if (this->blockdata.isEmpty() || this->width == 0 || this->height == 0) {
+        biome_pixmap = biome_pixmap.fromImage(biome_image);
+        return biome_pixmap;
+    }
+    QPainter painter(&biome_image);
+    // Each painted block is drawn over the previous frame, so clear cells that became
+    // transparent (e.g. the "none" biome) rather than compositing on stale pixels.
+    painter.setCompositionMode(QPainter::CompositionMode_Source);
+    for (int i = 0; i < this->blockdata.length(); i++) {
+        if (!ignoreCache && !layoutBlockChanged(i, this->blockdata, this->cached_biome)) {
+            continue;
+        }
+        changed_any = true;
+        Block block = this->blockdata.at(i);
+        QImage biome_metatile_image = getBiomeMetatileImage(block);
+        int x = this->width ? ((i % this->width) * Metatile::pixelWidth()) : 0;
+        int y = this->width ? ((i / this->width) * Metatile::pixelHeight()) : 0;
+        painter.drawImage(x, y, biome_metatile_image);
+    }
+    painter.end();
+    cacheBiome();
+    if (changed_any) {
+        biome_pixmap = biome_pixmap.fromImage(biome_image);
+    }
+    return biome_pixmap;
 }
 
 QPixmap Layout::renderBorder(bool ignoreCache) {

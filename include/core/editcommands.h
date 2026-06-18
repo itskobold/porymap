@@ -28,6 +28,9 @@ enum CommandId {
     ID_PaintLocation,
     ID_BucketFillLocation,
     ID_MagicFillLocation,
+    ID_PaintBiome,
+    ID_BucketFillBiome,
+    ID_MagicFillBiome,
     ID_ResizeLayout,
     ID_PaintBorder,
     ID_ScriptEditLayout,
@@ -230,6 +233,53 @@ public:
 
     bool mergeWith(const QUndoCommand *) override { return false; }
     int id() const override { return CommandId::ID_MagicFillLocation; }
+};
+
+
+
+/// Implements a command to commit paint actions on the metatile biome field.
+class PaintBiome : public PaintMetatile {
+public:
+    PaintBiome(Layout *layout,
+        const Blockdata &oldBiome, const Blockdata &newBiome,
+        unsigned actionId, QUndoCommand *parent = nullptr)
+    : PaintMetatile(layout, oldBiome, newBiome, actionId, parent) {
+        setText("Paint Biome");
+    }
+
+    int id() const override { return CommandId::ID_PaintBiome; }
+};
+
+
+
+/// Implements a command to commit flood fill actions on the metatile biome field.
+class BucketFillBiome : public PaintBiome {
+public:
+    BucketFillBiome(Layout *layout,
+        const Blockdata &oldBiome, const Blockdata &newBiome,
+        QUndoCommand *parent = nullptr)
+      : PaintBiome(layout, oldBiome, newBiome, -1, parent) {
+        setText("Flood Fill Biome");
+    }
+
+    bool mergeWith(const QUndoCommand *) override { return false; }
+    int id() const override { return CommandId::ID_BucketFillBiome; }
+};
+
+
+
+/// Implements a command to commit magic fill actions on the metatile biome field.
+class MagicFillBiome : public PaintBiome {
+public:
+    MagicFillBiome(Layout *layout,
+        const Blockdata &oldBiome, const Blockdata &newBiome,
+        QUndoCommand *parent = nullptr)
+    : PaintBiome(layout, oldBiome, newBiome, -1, parent) {
+        setText("Magic Fill Biome");
+    }
+
+    bool mergeWith(const QUndoCommand *) override { return false; }
+    int id() const override { return CommandId::ID_MagicFillBiome; }
 };
 
 
