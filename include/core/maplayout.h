@@ -241,6 +241,8 @@ private:
 
     static int getBorderDrawDistance(int dimension, qreal minimum);
 
+    void drawElevationBorders(QPainter &painter, int index, int px, int py);
+
     QList<int> m_metatileLayerOrder;
     QList<float> m_metatileLayerOpacity;
     static QList<int> s_globalMetatileLayerOrder;

@@ -649,15 +649,29 @@ QPixmap Layout::renderCollision(bool ignoreCache) {
     }
     QPainter painter(&collision_image);
     for (int i = 0; i < this->blockdata.length(); i++) {
-        if (!ignoreCache && !layoutBlockChanged(i, this->blockdata, this->cached_collision)) {
+        // Elevation region borders depend on a block's neighbours, so a block must be
+        // redrawn whenever it or any of its 4-adjacent neighbours changed.
+        bool needsRedraw = ignoreCache || layoutBlockChanged(i, this->blockdata, this->cached_collision);
+        if (!needsRedraw) {
+            const int bx = i % this->width;
+            const int by = i / this->width;
+            if ((bx > 0 && layoutBlockChanged(i - 1, this->blockdata, this->cached_collision))
+             || (bx < this->width - 1 && layoutBlockChanged(i + 1, this->blockdata, this->cached_collision))
+             || (by > 0 && layoutBlockChanged(i - this->width, this->blockdata, this->cached_collision))
+             || (by < this->height - 1 && layoutBlockChanged(i + this->width, this->blockdata, this->cached_collision))) {
+                needsRedraw = true;
+            }
+        }
+        if (!needsRedraw) {
             continue;
         }
         changed_any = true;
         Block block = this->blockdata.at(i);
         QImage collision_metatile_image = getCollisionMetatileImage(block);
-        int x = this->width ? ((i % this->width) * Metatile::pixelWidth()) : 0;
-        int y = this->width ? ((i / this->width) * Metatile::pixelHeight()) : 0;
+        int x = (i % this->width) * Metatile::pixelWidth();
+        int y = (i / this->width) * Metatile::pixelHeight();
         painter.drawImage(x, y, collision_metatile_image);
+        drawElevationBorders(painter, i, x, y);
     }
     painter.end();
     cacheCollision();
@@ -665,6 +679,43 @@ QPixmap Layout::renderCollision(bool ignoreCache) {
         collision_pixmap = collision_pixmap.fromImage(collision_image);
     }
     return collision_pixmap;
+}
+
+// Draws red lines along the edges of a block where it meets an adjacent block of a
+// different elevation level, making regions of differing elevation easy to distinguish.
+// Special tiles (elevation change, impassable, water, multi-level) are ignored: no border
+// is drawn for them or against them.
+void Layout::drawElevationBorders(QPainter &painter, int index, int px, int py) {
+    const Block &block = this->blockdata.at(index);
+    if (block.elevation() < Elevation::FirstLevel) {
+        return;
+    }
+
+    const int w = Metatile::pixelWidth();
+    const int h = Metatile::pixelHeight();
+    const int x = index % this->width;
+    const int y = index / this->width;
+
+    auto differs = [this, &block](int nx, int ny) -> bool {
+        if (nx < 0 || ny < 0 || nx >= this->width || ny >= this->height) {
+            return false;
+        }
+        const Block &neighbor = this->blockdata.at(ny * this->width + nx);
+        if (neighbor.elevation() < Elevation::FirstLevel) {
+            return false;
+        }
+        return neighbor.elevation() != block.elevation();
+    };
+
+    QPen pen(Qt::red);
+    pen.setWidth(2);
+    painter.save();
+    painter.setPen(pen);
+    if (differs(x - 1, y)) painter.drawLine(px + 1, py, px + 1, py + h - 1);             // left
+    if (differs(x + 1, y)) painter.drawLine(px + w - 1, py, px + w - 1, py + h - 1);     // right
+    if (differs(x, y - 1)) painter.drawLine(px, py + 1, px + w - 1, py + 1);             // top
+    if (differs(x, y + 1)) painter.drawLine(px, py + h - 1, px + w - 1, py + h - 1);     // bottom
+    painter.restore();
 }
 
 QPixmap Layout::renderLocation(bool ignoreCache) {

@@ -1666,6 +1666,7 @@ bool Editor::displayLayout() {
     displayCurrentMetatilesSelection();
     displayMapBorder();
     displayMapGrid();
+    displayMapOutline();
     maskNonVisibleConnectionTiles();
 
     if (map_item) {
@@ -2161,6 +2162,30 @@ void Editor::updateMapGrid() {
     displayMapGrid();
     if (ui->graphicsView_Map->scene())
         ui->graphicsView_Map->scene()->update();
+}
+
+void Editor::clearMapOutline() {
+    if (this->mapOutline) {
+        if (this->mapOutline->scene())
+            this->mapOutline->scene()->removeItem(this->mapOutline);
+        delete this->mapOutline;
+        this->mapOutline = nullptr;
+    }
+}
+
+void Editor::displayMapOutline() {
+    clearMapOutline();
+
+    // Cyan dashed outline around the map's main area, marking where the map ends and its
+    // border blocks / connections begin. Added to the shared scene so it appears in every
+    // view (metatiles, collision, locations, biome).
+    QPen pen(Qt::cyan);
+    pen.setWidth(2);
+    pen.setStyle(Qt::DashLine);
+    pen.setCosmetic(true);
+    const QRectF rect(0, 0, this->layout->pixelWidth(), this->layout->pixelHeight());
+    this->mapOutline = scene->addRect(rect, pen, Qt::NoBrush);
+    this->mapOutline->setZValue(ZValue::MapOutline);
 }
 
 void Editor::updatePrimaryTileset(QString tilesetLabel, bool forceLoad)

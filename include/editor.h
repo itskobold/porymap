@@ -88,6 +88,8 @@ public:
     void displayMapBorder();
     void displayMapGrid();
     void updateMapGrid();
+    void displayMapOutline();
+    void clearMapOutline();
     void displayWildMonTables();
 
     void updateMapBorder();
@@ -151,6 +153,7 @@ public:
 
     QList<QGraphicsPixmapItem*> borderItems;
     QGraphicsItemGroup *mapGrid = nullptr;
+    QGraphicsRectItem *mapOutline = nullptr;
     QPointer<MapRuler> map_ruler = nullptr;
 
     MovableRect *playerViewRect = nullptr;
@@ -230,6 +233,9 @@ public:
         // full range + 1 for the selected event (which should always be on top).
         EventMinimum = 1,
         EventMaximum = EventMinimum + 0x10000,
+
+        // Cyan outline marking the edge of the map (above the map content, below the ruler).
+        MapOutline,
 
         Ruler,
         ResizeLayoutPopup,
