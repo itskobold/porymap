@@ -92,6 +92,7 @@ public:
 
     void updateMapBorder();
     void updateMapConnections();
+    void updateConnectionOverlays();
 
     void setConnectionsVisibility(bool visible);
     void updateDivingMapsVisibility();

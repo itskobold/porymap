@@ -2839,18 +2839,21 @@ void MainWindow::on_horizontalSlider_CollisionTransparency_valueChanged(int valu
     this->editor->collisionOpacity = static_cast<qreal>(value) / 100;
     porymapConfig.collisionOpacity = value;
     this->editor->collision_item->draw(true);
+    this->editor->updateConnectionOverlays();
 }
 
 void MainWindow::on_horizontalSlider_LocationTransparency_valueChanged(int value) {
     this->editor->locationOpacity = static_cast<qreal>(value) / 100;
     if (this->editor->location_item)
         this->editor->location_item->draw(true);
+    this->editor->updateConnectionOverlays();
 }
 
 void MainWindow::on_horizontalSlider_BiomeTransparency_valueChanged(int value) {
     this->editor->biomeOpacity = static_cast<qreal>(value) / 100;
     if (this->editor->biome_item)
         this->editor->biome_item->draw(true);
+    this->editor->updateConnectionOverlays();
 }
 
 void MainWindow::on_actionPencil_triggered()     { on_toolButton_Paint_clicked(); }

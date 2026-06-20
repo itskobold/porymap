@@ -25,12 +25,44 @@ void ConnectionPixmapItem::refresh() {
     render(true);
 }
 
+// Render the active data layer (collision/location/biome) of the neighbouring map's edge,
+// so it can be drawn over the metatiles like it is on the current map.
+void ConnectionPixmapItem::updateOverlay() {
+    if (this->overlayLayer == Map::Layer::Metatiles) {
+        this->overlayPixmap = QPixmap();
+        return;
+    }
+    auto map = this->connection ? this->connection->targetMap() : nullptr;
+    this->overlayPixmap = map ? map->renderConnectionLayer(this->connection->direction(), this->overlayLayer)
+                              : QPixmap();
+}
+
+void ConnectionPixmapItem::setOverlay(Map::Layer layer, qreal opacity) {
+    this->overlayOpacity = opacity;
+    if (this->overlayLayer != layer) {
+        this->overlayLayer = layer;
+        updateOverlay();
+    }
+    render();
+}
+
 // Render additional visual effects on top of the base map image.
 void ConnectionPixmapItem::render(bool ignoreCache) {
-    if (ignoreCache)
+    if (ignoreCache) {
         this->basePixmap = this->connection->render();
+        updateOverlay();
+    }
 
     QPixmap pixmap = this->basePixmap.copy(0, 0, this->basePixmap.width(), this->basePixmap.height());
+
+    // Draw the active data layer over the metatiles, matching how the current map is displayed.
+    if (!this->overlayPixmap.isNull()) {
+        QPainter painter(&pixmap);
+        painter.setOpacity(this->overlayOpacity);
+        painter.drawPixmap(0, 0, this->overlayPixmap);
+        painter.end();
+    }
+
     this->setZValue(Editor::ZValue::MapConnectionActive);
 
     // When editing is inactive the current selection is ignored, all connections should appear normal.

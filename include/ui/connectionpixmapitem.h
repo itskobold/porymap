@@ -2,6 +2,7 @@
 #define CONNECTIONPIXMAPITEM_H
 
 #include "mapconnection.h"
+#include "map.h"
 #include "metatile.h"
 #include <QGraphicsPixmapItem>
 #include <QPainter>
@@ -20,6 +21,10 @@ public:
 
     void setSelected(bool selected);
 
+    // Sets which data layer (metatiles/collision/location/biome) is drawn over this
+    // connection's visible edge, matching the editor's current edit mode.
+    void setOverlay(Map::Layer layer, qreal opacity);
+
     void render(bool ignoreCache = false);
 
 signals:
@@ -27,6 +32,9 @@ signals:
 
 private:
     QPixmap basePixmap;
+    QPixmap overlayPixmap;
+    Map::Layer overlayLayer = Map::Layer::Metatiles;
+    qreal overlayOpacity = 1.0;
     qreal originX = 0;
     qreal originY = 0;
     bool selected = false;
@@ -37,6 +45,7 @@ private:
 
     void updatePos();
     void updateOrigin();
+    void updateOverlay();
     void refresh();
 
 protected:

@@ -127,6 +127,30 @@ QPixmap Map::renderConnection(const QString &direction, Layout * fromLayout) {
     return connectionPixmap.copy(bounds);
 }
 
+// Render the biome/location/collision data of the visible connection edge, so these
+// overlays can be drawn into the small visible areas of neighbouring maps just like the
+// metatiles are. Unlike the metatile render these layers don't depend on the parent map's
+// palettes, so there's no 'fromLayout' to pass through.
+QPixmap Map::renderConnectionLayer(const QString &direction, Layer layer) {
+    if (!m_layout)
+        return QPixmap();
+
+    QRect bounds = getConnectionRect(direction);
+    if (!bounds.isValid())
+        return QPixmap();
+
+    QPixmap pixmap;
+    switch (layer) {
+    case Layer::Collision: pixmap = m_layout->renderCollision(true); break;
+    case Layer::Location:  pixmap = m_layout->renderLocation(true);  break;
+    case Layer::Biome:     pixmap = m_layout->renderBiome(true);     break;
+    case Layer::Metatiles: // The metatile layer is handled by renderConnection.
+    default:
+        return QPixmap();
+    }
+    return pixmap.copy(bounds);
+}
+
 void Map::openScript(const QString &label) {
     emit openScriptRequested(label);
 }

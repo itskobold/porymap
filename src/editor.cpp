@@ -185,6 +185,7 @@ void Editor::setEditMode(EditMode editMode) {
     if (current_view) current_view->setVisible(true);
 
     updateBorderVisibility();
+    updateConnectionOverlays();
 
     QUndoStack *editStack = this->map ? this->map->editHistory() : nullptr;
     bool editingLayout = getEditingLayout();
@@ -2078,6 +2079,23 @@ void Editor::updateMapBorder() {
 void Editor::updateMapConnections() {
     for (auto item : connection_items)
         item->render(true);
+}
+
+// Draw the current edit mode's data layer (collision/location/biome) over the visible
+// edges of neighbouring maps, so the connections match what's shown on the current map.
+// Diving connections aren't in connection_items, so they're naturally excluded.
+void Editor::updateConnectionOverlays() {
+    Map::Layer layer = Map::Layer::Metatiles;
+    qreal opacity = 1.0;
+    switch (this->editMode) {
+    case EditMode::Collision: layer = Map::Layer::Collision; opacity = this->collisionOpacity; break;
+    case EditMode::Locations: layer = Map::Layer::Location;  opacity = this->locationOpacity;  break;
+    case EditMode::Biome:     layer = Map::Layer::Biome;     opacity = this->biomeOpacity;      break;
+    default: break;
+    }
+    for (auto item : connection_items) {
+        if (item) item->setOverlay(layer, opacity);
+    }
 }
 
 void Editor::toggleGrid(bool checked) {

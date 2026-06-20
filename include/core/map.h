@@ -106,6 +106,10 @@ public:
     QRect getConnectionRect(const QString &direction, Layout *fromLayout = nullptr) const;
     QPixmap renderConnection(const QString &direction, Layout *fromLayout = nullptr);
 
+    // The editable data layers a connection's visible edge can display, matching the editor's edit modes.
+    enum class Layer { Metatiles, Collision, Location, Biome };
+    QPixmap renderConnectionLayer(const QString &direction, Layer layer);
+
     QUndoStack* editHistory() const { return m_editHistory; }
     void commit(QUndoCommand*);
     void modify();
