@@ -44,6 +44,7 @@ public:
     NoScrollSpinBox *spinner_y;
     NoScrollSpinBox *spinner_z;
     QLabel *hideable_label_z;
+    QCheckBox *check_any_elevation;
 
     QLabel *label_icon;
 

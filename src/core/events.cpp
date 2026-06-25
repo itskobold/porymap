@@ -146,6 +146,7 @@ Event *ObjectEvent::duplicate() const {
     copy->setX(this->getX());
     copy->setY(this->getY());
     copy->setElevation(this->getElevation());
+    copy->setAnyElevation(this->getAnyElevation());
     copy->setIdName(this->getIdName());
     copy->setGfx(this->getGfx());
     copy->setMovement(this->getMovement());
@@ -182,6 +183,8 @@ OrderedJson::object ObjectEvent::buildEventJson(Project *) {
     objectJson["x"] = this->getX();
     objectJson["y"] = this->getY();
     objectJson["elevation"] = this->getElevation();
+    if (this->getAnyElevation())
+        objectJson["any_elevation"] = true;
     objectJson["movement_type"] = this->getMovement();
     objectJson["movement_range_x"] = this->getRadiusX();
     objectJson["movement_range_y"] = this->getRadiusY();
@@ -198,6 +201,7 @@ bool ObjectEvent::loadFromJson(QJsonObject json, Project *) {
     this->setX(readInt(&json, "x"));
     this->setY(readInt(&json, "y"));
     this->setElevation(readInt(&json, "elevation"));
+    this->setAnyElevation(readBool(&json, "any_elevation"));
     this->setIdName(readString(&json, "local_id"));
     this->setGfx(readString(&json, "graphics_id"));
     this->setMovement(readString(&json, "movement_type"));
@@ -230,6 +234,7 @@ QSet<QString> ObjectEvent::getExpectedFields() {
         "local_id",
         "graphics_id",
         "elevation",
+        "any_elevation",
         "movement_type",
         "movement_range_x",
         "movement_range_y",
@@ -261,6 +266,7 @@ Event *CloneObjectEvent::duplicate() const {
     copy->setX(this->getX());
     copy->setY(this->getY());
     copy->setElevation(this->getElevation());
+    copy->setAnyElevation(this->getAnyElevation());
     copy->setIdName(this->getIdName());
     copy->setGfx(this->getGfx());
     copy->setTargetID(this->getTargetID());
@@ -362,6 +368,7 @@ Event *WarpEvent::duplicate() const {
     copy->setX(this->getX());
     copy->setY(this->getY());
     copy->setElevation(this->getElevation());
+    copy->setAnyElevation(this->getAnyElevation());
     copy->setIdName(this->getIdName());
     copy->setDestinationMap(this->getDestinationMap());
     copy->setDestinationWarpID(this->getDestinationWarpID());
@@ -389,6 +396,8 @@ OrderedJson::object WarpEvent::buildEventJson(Project *project) {
     warpJson["x"] = this->getX();
     warpJson["y"] = this->getY();
     warpJson["elevation"] = this->getElevation();
+    if (this->getAnyElevation())
+        warpJson["any_elevation"] = true;
     const QString mapName = this->getDestinationMap();
     warpJson["dest_map"] = project->getMapConstant(mapName, mapName);
     warpJson["dest_warp_id"] = this->getDestinationWarpID();
@@ -402,6 +411,7 @@ bool WarpEvent::loadFromJson(QJsonObject json, Project *project) {
     this->setY(readInt(&json, "y"));
     this->setIdName(readString(&json, "warp_id"));
     this->setElevation(readInt(&json, "elevation"));
+    this->setAnyElevation(readBool(&json, "any_elevation"));
     this->setDestinationWarpID(readString(&json, "dest_warp_id"));
 
     // Log a warning if "dest_map" isn't a known map ID, but don't overwrite user data.
@@ -425,6 +435,7 @@ QSet<QString> WarpEvent::getExpectedFields() {
         "x",
         "y",
         "elevation",
+        "any_elevation",
         "dest_map",
         "dest_warp_id",
     };
@@ -449,6 +460,7 @@ Event *TriggerEvent::duplicate() const {
     copy->setX(this->getX());
     copy->setY(this->getY());
     copy->setElevation(this->getElevation());
+    copy->setAnyElevation(this->getAnyElevation());
     copy->setScriptVar(this->getScriptVar());
     copy->setScriptVarValue(this->getScriptVarValue());
     copy->setScriptLabel(this->getScriptLabel());
@@ -473,6 +485,8 @@ OrderedJson::object TriggerEvent::buildEventJson(Project *) {
     triggerJson["x"] = this->getX();
     triggerJson["y"] = this->getY();
     triggerJson["elevation"] = this->getElevation();
+    if (this->getAnyElevation())
+        triggerJson["any_elevation"] = true;
     triggerJson["var"] = this->getScriptVar();
     triggerJson["var_value"] = this->getScriptVarValue();
     triggerJson["script"] = this->getScriptLabel();
@@ -485,6 +499,7 @@ bool TriggerEvent::loadFromJson(QJsonObject json, Project *) {
     this->setX(readInt(&json, "x"));
     this->setY(readInt(&json, "y"));
     this->setElevation(readInt(&json, "elevation"));
+    this->setAnyElevation(readBool(&json, "any_elevation"));
     this->setScriptVar(readString(&json, "var"));
     this->setScriptVarValue(readString(&json, "var_value"));
     this->setScriptLabel(readString(&json, "script"));
@@ -506,6 +521,7 @@ QSet<QString> TriggerEvent::getExpectedFields() {
         "y",
         "type",
         "elevation",
+        "any_elevation",
         "var",
         "var_value",
         "script",
@@ -521,6 +537,7 @@ Event *WeatherTriggerEvent::duplicate() const {
     copy->setX(this->getX());
     copy->setY(this->getY());
     copy->setElevation(this->getElevation());
+    copy->setAnyElevation(this->getAnyElevation());
     copy->setWeather(this->getWeather());
 
     copy->setCustomAttributes(this->getCustomAttributes());
@@ -543,6 +560,8 @@ OrderedJson::object WeatherTriggerEvent::buildEventJson(Project *) {
     weatherJson["x"] = this->getX();
     weatherJson["y"] = this->getY();
     weatherJson["elevation"] = this->getElevation();
+    if (this->getAnyElevation())
+        weatherJson["any_elevation"] = true;
     weatherJson["weather"] = this->getWeather();
 
     OrderedJson::append(&weatherJson, this->getCustomAttributes());
@@ -553,6 +572,7 @@ bool WeatherTriggerEvent::loadFromJson(QJsonObject json, Project *) {
     this->setX(readInt(&json, "x"));
     this->setY(readInt(&json, "y"));
     this->setElevation(readInt(&json, "elevation"));
+    this->setAnyElevation(readBool(&json, "any_elevation"));
     this->setWeather(readString(&json, "weather"));
 
     this->setCustomAttributes(json);
@@ -570,6 +590,7 @@ QSet<QString> WeatherTriggerEvent::getExpectedFields() {
         "y",
         "type",
         "elevation",
+        "any_elevation",
         "weather",
     };
     return expectedFields;
@@ -583,6 +604,7 @@ Event *SignEvent::duplicate() const {
     copy->setX(this->getX());
     copy->setY(this->getY());
     copy->setElevation(this->getElevation());
+    copy->setAnyElevation(this->getAnyElevation());
     copy->setFacingDirection(this->getFacingDirection());
     copy->setScriptLabel(this->getScriptLabel());
 
@@ -606,6 +628,8 @@ OrderedJson::object SignEvent::buildEventJson(Project *) {
     signJson["x"] = this->getX();
     signJson["y"] = this->getY();
     signJson["elevation"] = this->getElevation();
+    if (this->getAnyElevation())
+        signJson["any_elevation"] = true;
     signJson["player_facing_dir"] = this->getFacingDirection();
     signJson["script"] = this->getScriptLabel();
 
@@ -617,6 +641,7 @@ bool SignEvent::loadFromJson(QJsonObject json, Project *) {
     this->setX(readInt(&json, "x"));
     this->setY(readInt(&json, "y"));
     this->setElevation(readInt(&json, "elevation"));
+    this->setAnyElevation(readBool(&json, "any_elevation"));
     this->setFacingDirection(readString(&json, "player_facing_dir"));
     this->setScriptLabel(readString(&json, "script"));
 
@@ -636,6 +661,7 @@ QSet<QString> SignEvent::getExpectedFields() {
         "y",
         "type",
         "elevation",
+        "any_elevation",
         "player_facing_dir",
         "script",
     };
@@ -650,6 +676,7 @@ Event *HiddenItemEvent::duplicate() const {
     copy->setX(this->getX());
     copy->setY(this->getY());
     copy->setElevation(this->getElevation());
+    copy->setAnyElevation(this->getAnyElevation());
     copy->setItem(this->getItem());
     copy->setFlag(this->getFlag());
     copy->setQuantity(this->getQuantity());
@@ -675,6 +702,8 @@ OrderedJson::object HiddenItemEvent::buildEventJson(Project *) {
     hiddenItemJson["x"] = this->getX();
     hiddenItemJson["y"] = this->getY();
     hiddenItemJson["elevation"] = this->getElevation();
+    if (this->getAnyElevation())
+        hiddenItemJson["any_elevation"] = true;
     hiddenItemJson["item"] = this->getItem();
     hiddenItemJson["flag"] = this->getFlag();
     if (projectConfig.hiddenItemQuantityEnabled) {
@@ -692,6 +721,7 @@ bool HiddenItemEvent::loadFromJson(QJsonObject json, Project *) {
     this->setX(readInt(&json, "x"));
     this->setY(readInt(&json, "y"));
     this->setElevation(readInt(&json, "elevation"));
+    this->setAnyElevation(readBool(&json, "any_elevation"));
     this->setItem(readString(&json, "item"));
     this->setFlag(readString(&json, "flag"));
     if (projectConfig.hiddenItemQuantityEnabled) {
@@ -722,6 +752,7 @@ QSet<QString> HiddenItemEvent::getExpectedFields() {
         "y",
         "type",
         "elevation",
+        "any_elevation",
         "item",
         "flag",
     };
@@ -742,6 +773,7 @@ Event *SecretBaseEvent::duplicate() const {
     copy->setX(this->getX());
     copy->setY(this->getY());
     copy->setElevation(this->getElevation());
+    copy->setAnyElevation(this->getAnyElevation());
     copy->setBaseID(this->getBaseID());
 
     copy->setCustomAttributes(this->getCustomAttributes());
@@ -764,6 +796,8 @@ OrderedJson::object SecretBaseEvent::buildEventJson(Project *) {
     secretBaseJson["x"] = this->getX();
     secretBaseJson["y"] = this->getY();
     secretBaseJson["elevation"] = this->getElevation();
+    if (this->getAnyElevation())
+        secretBaseJson["any_elevation"] = true;
     secretBaseJson["secret_base_id"] = this->getBaseID();
 
     OrderedJson::append(&secretBaseJson, this->getCustomAttributes());
@@ -774,6 +808,7 @@ bool SecretBaseEvent::loadFromJson(QJsonObject json, Project *) {
     this->setX(readInt(&json, "x"));
     this->setY(readInt(&json, "y"));
     this->setElevation(readInt(&json, "elevation"));
+    this->setAnyElevation(readBool(&json, "any_elevation"));
     this->setBaseID(readString(&json, "secret_base_id"));
 
     this->setCustomAttributes(json);
@@ -791,6 +826,7 @@ QSet<QString> SecretBaseEvent::getExpectedFields() {
         "y",
         "type",
         "elevation",
+        "any_elevation",
         "secret_base_id",
     };
     return expectedFields;

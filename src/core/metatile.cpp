@@ -121,9 +121,11 @@ void Metatile::setLayout(Project * project) {
     uint32_t terrainTypeMask = projectConfig.metatileTerrainTypeMask;
     uint32_t encounterTypeMask = projectConfig.metatileEncounterTypeMask;
     uint32_t layerTypeMask = projectConfig.metatileLayerTypeMask;
+    // 1-bit "use bg material" flag. Mirrors METATILE_ATTR_BGMATERIAL in pokeemerald.
+    const uint32_t bgMaterialMask = 0x0100;
 
     // Calculate mask of bits not used by standard behaviors so we can preserve this data.
-    uint32_t unusedMask = ~(behaviorMask | terrainTypeMask | encounterTypeMask | layerTypeMask);
+    uint32_t unusedMask = ~(behaviorMask | terrainTypeMask | encounterTypeMask | layerTypeMask | bgMaterialMask);
     unusedMask &= Metatile::getMaxAttributesMask();
 
     BitPacker packer = BitPacker(unusedMask);
@@ -174,4 +176,7 @@ void Metatile::setLayout(Project * project) {
                             .arg(maxLayerType + 1));
     }
     attributePackers.insert(Metatile::Attr::LayerType, packer);
+
+    // "Use bg material" flag (single bit, fixed mask).
+    attributePackers.insert(Metatile::Attr::BgMaterial, BitPacker(bgMaterialMask));
 }

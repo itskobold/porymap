@@ -22,15 +22,22 @@ struct MetatileSelectionItem
         : enabled(enabled_), metatileId(metatileId_), location(location_) {}
 };
 
+// Holds the non-metatile attributes captured from a picked tile (or external selection) so
+// painting can reproduce the whole tile, not just its metatile id.
 struct CollisionSelectionItem
 {
     bool enabled;
     uint16_t collision;
     uint16_t elevation;
+    uint16_t cliffCollision;
+    uint16_t biome;
+    uint16_t bgMaterial;
 
     // Default values + compatibility with older compilers
-    CollisionSelectionItem(bool enabled_ = false, uint16_t collision_ = 0, uint16_t elevation_ = 0)
-        : enabled(enabled_), collision(collision_), elevation(elevation_) {}
+    CollisionSelectionItem(bool enabled_ = false, uint16_t collision_ = 0, uint16_t elevation_ = 0,
+                           uint16_t cliffCollision_ = 0, uint16_t biome_ = 0, uint16_t bgMaterial_ = 0)
+        : enabled(enabled_), collision(collision_), elevation(elevation_),
+          cliffCollision(cliffCollision_), biome(biome_), bgMaterial(bgMaterial_) {}
 };
 
 struct MetatileSelection
@@ -65,6 +72,10 @@ public:
     void draw() override;
     void refresh();
 
+    // The bg material (1-15, 0 = none) used to preview metatiles flagged "use bg material".
+    void setSelectedBgMaterial(int value);
+    int selectedBgMaterial() const { return this->m_selectedBgMaterial; }
+
     // Sets which tileset section to display. For Secondary, an optional override lets the
     // picker render a secondary tileset other than the layout's active one (e.g. the
     // tileset of a different map location); locationIndex is the location slot that tileset
@@ -79,14 +90,15 @@ public:
     int paintLocation() const { return this->m_section == DisplaySection::Secondary ? this->m_secondaryLocation : -1; }
 
     bool select(uint16_t metatile);
-    // 'location' is the source block's location when picking off the map (-1 otherwise);
-    // see MetatileSelectionItem::location.
-    void selectFromMap(uint16_t metatileId, uint16_t collision, uint16_t elevation, int location = -1);
+    // Selects a single tile picked off the map, capturing all of its properties (metatile id,
+    // location, collision, elevation, cliff collision, biome, bgMaterial) so painting reproduces
+    // the whole tile.
+    void selectFromMap(const Block &block);
     MetatileSelection getMetatileSelection() const { return this->selection; }
     void setPrefabSelection(MetatileSelection selection);
     // 'locations' optionally gives the source location of each metatile (parallel to
     // 'metatiles'); pass an empty list when the metatiles didn't come from the map.
-    void setExternalSelection(int, int, const QList<uint16_t>&, const QList<QPair<uint16_t, uint16_t>>&, const QList<int> &locations = {});
+    void setExternalSelection(int, int, const QList<uint16_t>&, const QList<CollisionSelectionItem>&, const QList<int> &locations = {});
     QPoint getMetatileIdCoordsOnWidget(uint16_t metatileId) const;
     void setLayout(Layout *layout);
     bool isInternalSelection() const { return (!this->externalSelection && !this->prefabSelection); }
@@ -111,6 +123,7 @@ private:
     bool prefabSelection;
     Layout *layout;
     DisplaySection m_section = DisplaySection::All;
+    int m_selectedBgMaterial = 0;
     Tileset *m_secondaryOverride = nullptr;
     // The location slot the displayed secondary tileset belongs to (see paintLocation()).
     int m_secondaryLocation = 0;

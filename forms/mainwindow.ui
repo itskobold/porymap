@@ -980,6 +980,52 @@
                              <number>0</number>
                             </property>
                             <item>
+                             <layout class="QHBoxLayout" name="bgMaterialLayout">
+                              <item>
+                               <widget class="NoScrollGraphicsView" name="graphicsView_BgMaterial">
+                                <property name="sizePolicy">
+                                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                  <horstretch>0</horstretch>
+                                  <verstretch>0</verstretch>
+                                 </sizepolicy>
+                                </property>
+                                <property name="verticalScrollBarPolicy">
+                                 <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+                                </property>
+                                <property name="horizontalScrollBarPolicy">
+                                 <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+                                </property>
+                                <property name="toolTip">
+                                 <string>bgMaterial picker: the selected cell (0-15) is stamped onto painted tiles. Cell 0 (black) means no material.</string>
+                                </property>
+                               </widget>
+                              </item>
+                              <item>
+                               <widget class="QCheckBox" name="checkBox_PaintBgMaterialOnly">
+                                <property name="toolTip">
+                                 <string>Paint only the bgMaterial attribute, leaving the underlying metatile unchanged.</string>
+                                </property>
+                                <property name="text">
+                                 <string>bgMaterial only</string>
+                                </property>
+                               </widget>
+                              </item>
+                              <item>
+                               <spacer name="bgMaterialSpacer">
+                                <property name="orientation">
+                                 <enum>Qt::Orientation::Horizontal</enum>
+                                </property>
+                                <property name="sizeHint" stdset="0">
+                                 <size>
+                                  <width>0</width>
+                                  <height>0</height>
+                                 </size>
+                                </property>
+                               </spacer>
+                              </item>
+                             </layout>
+                            </item>
+                            <item>
                              <widget class="QTabBar" name="tabBar_TilesetSelector">
                               <property name="toolTip">
                                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Choose which tileset's metatiles to show: the primary tileset, or one of the map's per-location secondary tilesets.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -1183,7 +1229,7 @@
                      </sizepolicy>
                     </property>
                     <attribute name="title">
-                     <string>Collision</string>
+                     <string>Elevation</string>
                     </attribute>
                     <layout class="QGridLayout" name="gridLayout_CollisionSelection">
                      <property name="sizeConstraint">
@@ -1208,114 +1254,23 @@
                        </property>
                       </widget>
                      </item>
-                     <item row="5" column="0" colspan="3">
-                      <widget class="QScrollArea" name="scrollArea_Collision">
-                       <property name="widgetResizable">
-                        <bool>true</bool>
+                     <item row="2" column="0" colspan="3">
+                      <widget class="QCheckBox" name="checkBox_PaintCollision">
+                       <property name="toolTip">
+                        <string>Paint impassable collision instead of elevation levels</string>
                        </property>
-                       <widget class="QWidget" name="scrollAreaWidgetContents_Collision">
-                        <property name="geometry">
-                         <rect>
-                          <x>0</x>
-                          <y>0</y>
-                          <width>428</width>
-                          <height>633</height>
-                         </rect>
-                        </property>
-                        <layout class="QGridLayout" name="gridLayout_7">
-                         <property name="leftMargin">
-                          <number>0</number>
-                         </property>
-                         <property name="topMargin">
-                          <number>0</number>
-                         </property>
-                         <property name="rightMargin">
-                          <number>0</number>
-                         </property>
-                         <property name="bottomMargin">
-                          <number>0</number>
-                         </property>
-                         <property name="spacing">
-                          <number>0</number>
-                         </property>
-                         <item row="2" column="0">
-                          <spacer name="horizontalSpacer_18">
-                           <property name="orientation">
-                            <enum>Qt::Orientation::Horizontal</enum>
-                           </property>
-                           <property name="sizeHint" stdset="0">
-                            <size>
-                             <width>86</width>
-                             <height>20</height>
-                            </size>
-                           </property>
-                          </spacer>
-                         </item>
-                         <item row="2" column="1">
-                          <widget class="NoScrollGraphicsView" name="graphicsView_CollisionSelector">
-                           <property name="sizePolicy">
-                            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                             <horstretch>0</horstretch>
-                             <verstretch>0</verstretch>
-                            </sizepolicy>
-                           </property>
-                           <property name="minimumSize">
-                            <size>
-                             <width>160</width>
-                             <height>40</height>
-                            </size>
-                           </property>
-                           <property name="verticalScrollBarPolicy">
-                            <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
-                           </property>
-                           <property name="horizontalScrollBarPolicy">
-                            <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
-                           </property>
-                          </widget>
-                         </item>
-                         <item row="2" column="2">
-                          <spacer name="horizontalSpacer_19">
-                           <property name="orientation">
-                            <enum>Qt::Orientation::Horizontal</enum>
-                           </property>
-                           <property name="sizeHint" stdset="0">
-                            <size>
-                             <width>86</width>
-                             <height>20</height>
-                            </size>
-                           </property>
-                          </spacer>
-                         </item>
-                         <item row="3" column="1">
-                          <spacer name="verticalSpacer_6">
-                           <property name="orientation">
-                            <enum>Qt::Orientation::Vertical</enum>
-                           </property>
-                           <property name="sizeHint" stdset="0">
-                            <size>
-                             <width>20</width>
-                             <height>94</height>
-                            </size>
-                           </property>
-                          </spacer>
-                         </item>
-                        </layout>
-                       </widget>
+                       <property name="text">
+                        <string>Paint collision</string>
+                       </property>
                       </widget>
                      </item>
-                     <item row="6" column="0" colspan="3">
-                      <widget class="QSlider" name="horizontalSlider_CollisionZoom">
-                       <property name="minimum">
-                        <number>10</number>
+                     <item row="1" column="0" colspan="3">
+                      <widget class="QCheckBox" name="checkBox_PaintCliffCollision">
+                       <property name="toolTip">
+                        <string>Paint cliff collision (blocks objects behind a cliff). Painting normal collision also sets this.</string>
                        </property>
-                       <property name="maximum">
-                        <number>90</number>
-                       </property>
-                       <property name="value">
-                        <number>30</number>
-                       </property>
-                       <property name="orientation">
-                        <enum>Qt::Orientation::Horizontal</enum>
+                       <property name="text">
+                        <string>Paint cliff collision</string>
                        </property>
                       </widget>
                      </item>
@@ -1370,13 +1325,13 @@
                         <item row="1" column="0" colspan="3">
                          <widget class="QSlider" name="horizontalSlider_CollisionLevel">
                           <property name="toolTip">
-                           <string>Elevation level for the &quot;all levels&quot; collision tile</string>
+                           <string>Elevation level to paint</string>
                           </property>
                           <property name="minimum">
                            <number>0</number>
                           </property>
                           <property name="maximum">
-                           <number>123</number>
+                           <number>63</number>
                           </property>
                           <property name="orientation">
                            <enum>Qt::Orientation::Horizontal</enum>

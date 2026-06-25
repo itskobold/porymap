@@ -33,6 +33,17 @@ public:
     void setElevationLevel(int level);         // set the "all levels" level, re-evaluate value
     static int maxElevationLevel();            // Block::getMaxElevation() - FirstLevel
 
+    // Collision-vs-elevation paint mode. When painting collision, the tile is marked
+    // impassable; otherwise the selected elevation level is painted. The elevation level
+    // (selectedValue) is always applied to the tile in both modes.
+    bool paintCollision() const { return m_paintCollision; }
+    void setPaintCollision(bool on) { m_paintCollision = on; }
+
+    // Cliff collision paint mode. Painted independently of normal collision; painting normal
+    // collision also sets cliff collision (handled by the paint code, not here).
+    bool paintCliffCollision() const { return m_paintCliffCollision; }
+    void setPaintCliffCollision(bool on) { m_paintCliffCollision = on; }
+
     static const int CellWidth;
     static const int CellHeight;
 
@@ -44,6 +55,8 @@ private:
     uint16_t valueAt(int cell) const;
     QPixmap basePixmap;
     int m_level = 0; // user-facing elevation level for the "all levels" cell
+    bool m_paintCollision = false; // paint mode: collision (true) vs elevation level (false)
+    bool m_paintCliffCollision = false; // paint cliff collision (bit 6)
 
 signals:
     void selectedValueChanged(uint16_t value);

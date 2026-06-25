@@ -3,6 +3,7 @@
 #include "log.h"
 #include "scripting.h"
 #include "editor.h"
+#include "bgmaterialselector.h"
 
 #include "editcommands.h"
 
@@ -47,19 +48,15 @@ void LayoutPixmapItem::paint(QGraphicsSceneMouseEvent *event) {
             // Paint onto the map.
             bool shiftPressed = event->modifiers() & Qt::ShiftModifier;
             QSize selectionDimensions = this->metatileSelector->getSelectionDimensions();
-            if (settings->smartPathsEnabled) {
-                if (!shiftPressed && isSmartPathSize(selectionDimensions)) {
-                    paintSmartPath(pos.x(), pos.y());
-                } else {
-                    paintNormal(pos.x(), pos.y());
-                }
-            } else {
-                if (shiftPressed && isSmartPathSize(selectionDimensions)) {
-                    paintSmartPath(pos.x(), pos.y());
-                } else {
-                    paintNormal(pos.x(), pos.y());
-                }
-            }
+            // bgMaterial "paint only" mode always uses the normal brush; smart paths are about
+            // metatile patterns, which paint-only mode deliberately leaves untouched.
+            bool bgOnly = this->bgMaterialSelector && this->bgMaterialSelector->paintOnly();
+            bool smartPath = !bgOnly && isSmartPathSize(selectionDimensions)
+                          && (settings->smartPathsEnabled ? !shiftPressed : shiftPressed);
+            if (smartPath)
+                paintSmartPath(pos.x(), pos.y());
+            else
+                paintNormal(pos.x(), pos.y());
         }
     }
 }
@@ -138,6 +135,11 @@ void LayoutPixmapItem::paintNormal(int x, int y, bool fromScriptCall) {
     x = initialX + (xDiff / selection.dimensions.width()) * selection.dimensions.width();
     y = initialY + (yDiff / selection.dimensions.height()) * selection.dimensions.height();
 
+    // bgMaterial picker: stamp its value onto every painted tile (UI paints only). In
+    // "paint only" mode the metatile/collision are left unchanged and only bgMaterial is set.
+    bool stampBg = !fromScriptCall && this->bgMaterialSelector;
+    bool bgOnly = stampBg && this->bgMaterialSelector->paintOnly();
+
     // for edit history
     Blockdata oldMetatiles = !fromScriptCall ? this->layout->blockdata : Blockdata();
 
@@ -151,12 +153,22 @@ void LayoutPixmapItem::paintNormal(int x, int y, bool fromScriptCall) {
             MetatileSelectionItem item = selection.metatileItems.value(index);
             if (!item.enabled)
                 continue;
-            setBlockMetatile(&block, item.metatileId, locationForItem(item, paintLocation));
-            if (selection.hasCollision && selection.collisionItems.length() == selection.metatileItems.length()) {
-                CollisionSelectionItem collisionItem = selection.collisionItems.value(index);
-                block.setCollision(collisionItem.collision);
-                block.setElevation(collisionItem.elevation);
+            bool reproduceAttrs = selection.hasCollision && selection.collisionItems.length() == selection.metatileItems.length();
+            if (!bgOnly) {
+                setBlockMetatile(&block, item.metatileId, locationForItem(item, paintLocation));
+                if (reproduceAttrs) {
+                    CollisionSelectionItem collisionItem = selection.collisionItems.value(index);
+                    block.setCollision(collisionItem.collision);
+                    block.setElevation(collisionItem.elevation);
+                    block.setCliffCollision(collisionItem.cliffCollision);
+                    block.setBiome(collisionItem.biome);
+                    // A picked tile's own bgMaterial overrides the picker selection.
+                    block.setBgMaterial(collisionItem.bgMaterial);
+                }
             }
+            // Picker bgMaterial applies only when not reproducing a picked tile (or in paint-only mode).
+            if (stampBg && (bgOnly || !reproduceAttrs))
+                block.setBgMaterial(this->bgMaterialSelector->selectedBgMaterial());
             this->layout->setBlock(actualX, actualY, block, !fromScriptCall);
         }
     }
@@ -219,6 +231,8 @@ void LayoutPixmapItem::paintSmartPath(int x, int y, bool fromScriptCall) {
     if (!isValidSmartPathSelection(selection))
         return;
     int paintLocation = fromScriptCall ? -1 : this->metatileSelector->paintLocation();
+    // Stamp the picker's bgMaterial onto painted tiles (smart path never runs in "paint only").
+    bool stampBg = !fromScriptCall && this->bgMaterialSelector;
 
     // Shift to the middle tile of the smart path selection.
     uint16_t openMetatileId = selection.metatileItems.at(smartPathMiddleIndex).metatileId;
@@ -249,6 +263,8 @@ void LayoutPixmapItem::paintSmartPath(int x, int y, bool fromScriptCall) {
                 block.setCollision(openCollision);
                 block.setElevation(openElevation);
             }
+            if (stampBg)
+                block.setBgMaterial(this->bgMaterialSelector->selectedBgMaterial());
             this->layout->setBlock(actualX, actualY, block, !fromScriptCall);
         }
     }
@@ -294,6 +310,8 @@ void LayoutPixmapItem::paintSmartPath(int x, int y, bool fromScriptCall) {
             block.setCollision(collisionItem.collision);
             block.setElevation(collisionItem.elevation);
         }
+        if (stampBg)
+            block.setBgMaterial(this->bgMaterialSelector->selectedBgMaterial());
         this->layout->setBlock(actualX, actualY, block, !fromScriptCall);
     }
 
@@ -355,7 +373,9 @@ void LayoutPixmapItem::updateMetatileSelection(QGraphicsSceneMouseEvent *event) 
         selection.append(QPoint(pos.x(), pos.y()));
         Block block;
         if (this->layout->getBlock(pos.x(), pos.y(), &block)) {
-            this->metatileSelector->selectFromMap(block.metatileId(), block.collision(), block.elevation(), block.location());
+            this->metatileSelector->selectFromMap(block);
+            if (this->bgMaterialSelector)
+                this->bgMaterialSelector->setSelectedBgMaterial(block.bgMaterial());
         }
     } else if (event->type() == QEvent::GraphicsSceneMouseMove) {
         if (pos == this->lastMetatileSelectionPos)
@@ -375,7 +395,7 @@ void LayoutPixmapItem::updateMetatileSelection(QGraphicsSceneMouseEvent *event) 
         }
 
         QList<uint16_t> metatiles;
-        QList<QPair<uint16_t, uint16_t>> collisions;
+        QList<CollisionSelectionItem> collisions;
         QList<int> locations;
         for (QPoint point : selection) {
             int x = point.x();
@@ -386,9 +406,8 @@ void LayoutPixmapItem::updateMetatileSelection(QGraphicsSceneMouseEvent *event) 
             }
             int blockIndex = y * this->layout->getWidth() + x;
             block = this->layout->blockdata.value(blockIndex);
-            auto collision = block.collision();
-            auto elevation = block.elevation();
-            collisions.append(QPair<uint16_t, uint16_t>(collision, elevation));
+            collisions.append(CollisionSelectionItem{true, block.collision(), block.elevation(),
+                                                     block.cliffCollision(), block.biome(), block.bgMaterial()});
             locations.append(block.location());
         }
 
@@ -405,7 +424,13 @@ void LayoutPixmapItem::floodFill(QGraphicsSceneMouseEvent *event) {
             Block block;
             MetatileSelection selection = this->metatileSelector->getMetatileSelection();
             int metatileId = selection.metatileItems.first().metatileId;
-            if (selection.metatileItems.count() > 1 || (this->layout->getBlock(pos.x(), pos.y(), &block) && block.metatileId() != metatileId)) {
+            bool hasBlock = this->layout->getBlock(pos.x(), pos.y(), &block);
+            // Fill if the metatile changes, or (when stamping bgMaterial) the bgMaterial changes,
+            // so a bucket fill can set bgMaterial over a region of the same metatile.
+            bool changesMetatile = selection.metatileItems.count() > 1 || (hasBlock && block.metatileId() != metatileId);
+            bool changesBg = this->bgMaterialSelector && hasBlock
+                          && block.bgMaterial() != this->bgMaterialSelector->selectedBgMaterial();
+            if (changesMetatile || changesBg) {
                 bool smartPathsEnabled = event->modifiers() & Qt::ShiftModifier;
                 if ((this->settings->smartPathsEnabled || smartPathsEnabled) && isSmartPathSize(selection.dimensions))
                     this->floodFillSmartPath(pos.x(), pos.y());
@@ -445,16 +470,26 @@ void LayoutPixmapItem::magicFill(
         const QList<MetatileSelectionItem> &selectedMetatiles,
         const QList<CollisionSelectionItem> &selectedCollisions,
         bool fromScriptCall) {
+    bool stampBg = !fromScriptCall && this->bgMaterialSelector;
+    bool bgOnly = stampBg && this->bgMaterialSelector->paintOnly();
     Block block;
     if (this->layout->getBlock(initialX, initialY, &block)) {
-        if (selectedMetatiles.length() == 1 && selectedMetatiles.at(0).metatileId == block.metatileId()) {
+        bool setCollisions = selectedCollisions.length() == selectedMetatiles.length();
+        // bgMaterial that will be applied: a picked tile's own material (reproducing attributes)
+        // overrides the picker; otherwise the picker's value.
+        uint16_t effectiveBg = (setCollisions && !bgOnly && !selectedCollisions.isEmpty())
+                ? selectedCollisions.at(0).bgMaterial
+                : (stampBg ? this->bgMaterialSelector->selectedBgMaterial() : block.bgMaterial());
+        // Don't bail when the metatile already matches if paint-only mode or a bgMaterial
+        // change means there's still something to apply.
+        bool bgChanges = stampBg && block.bgMaterial() != effectiveBg;
+        if (!bgOnly && !bgChanges && selectedMetatiles.length() == 1 && selectedMetatiles.at(0).metatileId == block.metatileId()) {
             return;
         }
 
         Blockdata oldMetatiles = !fromScriptCall ? this->layout->blockdata : Blockdata();
 
         int paintLocation = fromScriptCall ? -1 : this->metatileSelector->paintLocation();
-        bool setCollisions = selectedCollisions.length() == selectedMetatiles.length();
         uint16_t metatileId = block.metatileId();
         for (int y = 0; y < this->layout->getHeight(); y++) {
             for (int x = 0; x < this->layout->getWidth(); x++) {
@@ -467,12 +502,19 @@ void LayoutPixmapItem::magicFill(
                     if (j < 0) j = selectionDimensions.height() + j;
                     int index = j * selectionDimensions.width() + i;
                     if (index < selectedMetatiles.length() && selectedMetatiles.at(index).enabled) {
-                        setBlockMetatile(&block, selectedMetatiles.at(index).metatileId, locationForItem(selectedMetatiles.at(index), paintLocation));
-                        if (setCollisions) {
-                            CollisionSelectionItem item = selectedCollisions.at(index);
-                            block.setCollision(item.collision);
-                            block.setElevation(item.elevation);
+                        if (!bgOnly) {
+                            setBlockMetatile(&block, selectedMetatiles.at(index).metatileId, locationForItem(selectedMetatiles.at(index), paintLocation));
+                            if (setCollisions) {
+                                CollisionSelectionItem item = selectedCollisions.at(index);
+                                block.setCollision(item.collision);
+                                block.setElevation(item.elevation);
+                                block.setCliffCollision(item.cliffCollision);
+                                block.setBiome(item.biome);
+                                block.setBgMaterial(item.bgMaterial); // picked material overrides picker
+                            }
                         }
+                        if (stampBg && (bgOnly || !setCollisions))
+                            block.setBgMaterial(this->bgMaterialSelector->selectedBgMaterial());
                         this->layout->setBlock(x, y, block, !fromScriptCall);
                     }
                 }
@@ -505,6 +547,8 @@ void LayoutPixmapItem::floodFill(
         bool fromScriptCall) {
     bool setCollisions = selectedCollisions.length() == selectedMetatiles.length();
     int paintLocation = fromScriptCall ? -1 : this->metatileSelector->paintLocation();
+    bool stampBg = !fromScriptCall && this->bgMaterialSelector;
+    bool bgOnly = stampBg && this->bgMaterialSelector->paintOnly();
     Blockdata oldMetatiles = !fromScriptCall ? this->layout->blockdata : Blockdata();
 
     QSet<int> visited;
@@ -529,13 +573,28 @@ void LayoutPixmapItem::floodFill(
         int index = j * selectionDimensions.width() + i;
         uint16_t metatileId = selectedMetatiles.value(index).metatileId;
         uint16_t old_metatileId = block.metatileId();
-        if (selectedMetatiles.value(index).enabled && (selectedMetatiles.count() != 1 || old_metatileId != metatileId)) {
-            setBlockMetatile(&block, metatileId, locationForItem(selectedMetatiles.value(index), paintLocation));
-            if (setCollisions) {
-                CollisionSelectionItem item = selectedCollisions.value(index);
-                block.setCollision(item.collision);
-                block.setElevation(item.elevation);
+        // The bgMaterial that will be applied: a picked tile's own material (reproducing
+        // attributes) overrides the picker; otherwise the picker's value.
+        bool reproduceAttrs = setCollisions && !bgOnly;
+        uint16_t effectiveBg = reproduceAttrs ? selectedCollisions.value(index).bgMaterial
+                             : (stampBg ? this->bgMaterialSelector->selectedBgMaterial() : block.bgMaterial());
+        // Modify enabled cells when the metatile changes, in paint-only mode, or when the
+        // bgMaterial would change (so a same-metatile region still gets its bgMaterial filled).
+        bool bgChanges = stampBg && block.bgMaterial() != effectiveBg;
+        if (selectedMetatiles.value(index).enabled && (bgOnly || bgChanges || selectedMetatiles.count() != 1 || old_metatileId != metatileId)) {
+            if (!bgOnly) {
+                setBlockMetatile(&block, metatileId, locationForItem(selectedMetatiles.value(index), paintLocation));
+                if (setCollisions) {
+                    CollisionSelectionItem item = selectedCollisions.value(index);
+                    block.setCollision(item.collision);
+                    block.setElevation(item.elevation);
+                    block.setCliffCollision(item.cliffCollision);
+                    block.setBiome(item.biome);
+                    block.setBgMaterial(item.bgMaterial); // picked material overrides picker
+                }
             }
+            if (stampBg && (bgOnly || !setCollisions))
+                block.setBgMaterial(this->bgMaterialSelector->selectedBgMaterial());
             this->layout->setBlock(x, y, block, !fromScriptCall);
         }
         if (!visited.contains(x + 1 + y * this->layout->getWidth()) && this->layout->getBlock(x + 1, y, &block) && block.metatileId() == old_metatileId) {
@@ -566,6 +625,8 @@ void LayoutPixmapItem::floodFillSmartPath(int initialX, int initialY, bool fromS
     if (!isValidSmartPathSelection(selection))
         return;
     int paintLocation = fromScriptCall ? -1 : this->metatileSelector->paintLocation();
+    // Stamp the picker's bgMaterial onto painted tiles (smart path never runs in "paint only").
+    bool stampBg = !fromScriptCall && this->bgMaterialSelector;
 
     // Shift to the middle tile of the smart path selection.
     uint16_t openMetatileId = selection.metatileItems.at(smartPathMiddleIndex).metatileId;
@@ -604,6 +665,8 @@ void LayoutPixmapItem::floodFillSmartPath(int initialX, int initialY, bool fromS
             block.setCollision(openCollision);
             block.setElevation(openElevation);
         }
+        if (stampBg)
+            block.setBgMaterial(this->bgMaterialSelector->selectedBgMaterial());
         this->layout->setBlock(x, y, block, !fromScriptCall);
         if (this->layout->getBlock(x + 1, y, &block) && block.metatileId() == old_metatileId) {
             todo.append(QPoint(x + 1, y));
@@ -656,6 +719,8 @@ void LayoutPixmapItem::floodFillSmartPath(int initialX, int initialY, bool fromS
             block.setCollision(item.collision);
             block.setElevation(item.elevation);
         }
+        if (stampBg)
+            block.setBgMaterial(this->bgMaterialSelector->selectedBgMaterial());
         this->layout->setBlock(x, y, block, !fromScriptCall);
 
         // Visit neighbors if they are smart-path tiles, and don't revisit any.
@@ -686,7 +751,10 @@ void LayoutPixmapItem::pick(QGraphicsSceneMouseEvent *event) {
     QPoint pos = Metatile::coordFromPixmapCoord(event->pos());
     Block block;
     if (this->layout->getBlock(pos.x(), pos.y(), &block)) {
-        this->metatileSelector->selectFromMap(block.metatileId(), block.collision(), block.elevation(), block.location());
+        this->metatileSelector->selectFromMap(block);
+        // Sync the bg material picker to the picked tile so its material is reflected/reproduced.
+        if (this->bgMaterialSelector)
+            this->bgMaterialSelector->setSelectedBgMaterial(block.bgMaterial());
     }
 }
 

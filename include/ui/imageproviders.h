@@ -22,10 +22,13 @@ QImage getBiomeMetatileImage(int);
 
 QImage getMetatileImage(uint16_t, const Layout*, bool useTruePalettes = false);
 QImage getMetatileImage(const Metatile*, const Layout*, bool useTruePalettes = false);
-QImage getMetatileImage(uint16_t, const Tileset*, const Tileset*, const QList<int>& = {0,1,2}, const QList<float>& = {}, bool useTruePalettes = false);
-QImage getMetatileImage(const Metatile*, const Tileset*, const Tileset*, const QList<int>& = {0,1,2}, const QList<float>& = {}, bool useTruePalettes = false);
+QImage getMetatileImage(uint16_t, const Tileset*, const Tileset*, const QList<int>& = {0,1,2}, const QList<float>& = {}, bool useTruePalettes = false, const Metatile *bgMaterialMetatile = nullptr);
+QImage getMetatileImage(const Metatile*, const Tileset*, const Tileset*, const QList<int>& = {0,1,2}, const QList<float>& = {}, bool useTruePalettes = false, const Metatile *bgMaterialMetatile = nullptr);
 
-QImage getMetatileSheetImage(const Layout *layout, int numMetatilesWIde, bool useTruePalettes = false);
+// selectedBgMaterial: if >= 0, metatiles flagged "use bg material" are rendered using
+// primary metatile #selectedBgMaterial as their material (mirrors the in-game picker).
+// -1 = no material context (default), used by previews not tied to the bg-material picker.
+QImage getMetatileSheetImage(const Layout *layout, int numMetatilesWIde, bool useTruePalettes = false, int selectedBgMaterial = -1);
 QImage getMetatileSheetImage(const Tileset *primaryTileset,
                              const Tileset *secondaryTileset,
                              uint16_t metatileIdStart,
@@ -34,14 +37,16 @@ QImage getMetatileSheetImage(const Tileset *primaryTileset,
                              const QList<int> &layerOrder,
                              const QList<float> &layerOpacity = {},
                              const QSize &metatileSize = Metatile::pixelSize(),
-                             bool useTruePalettes = false);
+                             bool useTruePalettes = false,
+                             int selectedBgMaterial = -1);
 QImage getMetatileSheetImage(const Tileset *primaryTileset,
                              const Tileset *secondaryTileset,
                              int numMetatilesWide,
                              const QList<int> &layerOrder,
                              const QList<float> &layerOpacity = {},
                              const QSize &metatileSize = Metatile::pixelSize(),
-                             bool useTruePalettes = false);
+                             bool useTruePalettes = false,
+                             int selectedBgMaterial = -1);
 
 
 QImage getTileImage(uint16_t, const Tileset*, const Tileset*);

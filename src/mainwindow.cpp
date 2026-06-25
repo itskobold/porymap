@@ -719,9 +719,7 @@ void MainWindow::loadUserSettings() {
 
     // Zoom
     const QSignalBlocker b_MetatileZoom(ui->horizontalSlider_MetatileZoom);
-    const QSignalBlocker b_CollisionZoom(ui->horizontalSlider_CollisionZoom);
     ui->horizontalSlider_MetatileZoom->setValue(porymapConfig.metatilesZoom);
-    ui->horizontalSlider_CollisionZoom->setValue(porymapConfig.collisionZoom);
 
     ui->checkBox_MirrorConnections->setChecked(porymapConfig.mirrorConnectingMaps);
     ui->checkBox_ToggleBorder->setChecked(porymapConfig.showBorder);
@@ -1314,15 +1312,17 @@ void MainWindow::refreshMapScene() {
     //ui->graphicsView_Metatiles->setSceneRect(editor->scene_metatiles->sceneRect());
     ui->graphicsView_Metatiles->setFixedSize(editor->metatile_selector_item->pixmap().width() + 2, editor->metatile_selector_item->pixmap().height() + 2);
 
+    if (editor->bgMaterial_selector_item) {
+        ui->graphicsView_BgMaterial->setScene(editor->scene_bgMaterial);
+        ui->graphicsView_BgMaterial->setFixedSize(editor->bgMaterial_selector_item->pixmap().width() + 2, editor->bgMaterial_selector_item->pixmap().height() + 2);
+        ui->checkBox_PaintBgMaterialOnly->setChecked(editor->bgMaterial_selector_item->paintOnly());
+    }
+
     ui->graphicsView_BorderMetatile->setScene(editor->scene_selected_border_metatiles);
     ui->graphicsView_BorderMetatile->setFixedSize(editor->selected_border_metatiles_item->pixmap().width() + 2, editor->selected_border_metatiles_item->pixmap().height() + 2);
 
     ui->graphicsView_currentMetatileSelection->setScene(editor->scene_current_metatile_selection);
     ui->graphicsView_currentMetatileSelection->setFixedSize(editor->current_metatile_selection_item->pixmap().width() + 2, editor->current_metatile_selection_item->pixmap().height() + 2);
-
-    ui->graphicsView_CollisionSelector->setScene(editor->scene_collision_metatiles);
-    //ui->graphicsView_CollisionSelector->setSceneRect(editor->scene_collision_metatiles->sceneRect());
-    ui->graphicsView_CollisionSelector->setFixedSize(editor->movement_permissions_selector_item->pixmap().width() + 2, editor->movement_permissions_selector_item->pixmap().height() + 2);
 
     ui->graphicsView_LocationSelector->setScene(editor->scene_location_metatiles);
     ui->graphicsView_LocationSelector->setFixedSize(editor->location_selector_item->pixmap().width() + 2, editor->location_selector_item->pixmap().height() + 2);
@@ -1342,7 +1342,7 @@ void MainWindow::refreshMetatileViews() {
 }
 
 void MainWindow::refreshCollisionSelector() {
-    on_horizontalSlider_CollisionZoom_valueChanged(ui->horizontalSlider_CollisionZoom->value());
+    // The collision/elevation picker palette was removed; nothing to refresh.
 }
 
 void MainWindow::refreshLocationSelector() {
@@ -2196,6 +2196,9 @@ void MainWindow::copy() {
                     OrderedJson::object collision;
                     collision["collision"] = item.collision;
                     collision["elevation"] = item.elevation;
+                    collision["cliff_collision"] = item.cliffCollision;
+                    collision["biome"] = item.biome;
+                    collision["bg_material"] = item.bgMaterial;
                     collisions.append(collision);
                 }
             }
@@ -2332,13 +2335,20 @@ void MainWindow::paste() {
                 int width = ParseUtil::jsonToInt(pasteObject["width"]);
                 int height = ParseUtil::jsonToInt(pasteObject["height"]);
                 QList<uint16_t> metatiles;
-                QList<QPair<uint16_t, uint16_t>> collisions;
+                QList<CollisionSelectionItem> collisions;
                 QList<int> locations;
                 for (auto tile : metatilesArray) {
                     metatiles.append(static_cast<uint16_t>(tile.toInt()));
                 }
                 for (QJsonValue collision : collisionsArray) {
-                    collisions.append({static_cast<uint16_t>(collision["collision"].toInt()), static_cast<uint16_t>(collision["elevation"].toInt())});
+                    // cliff_collision/biome/bg_material are absent in older clipboard data (default 0).
+                    collisions.append(CollisionSelectionItem{
+                        true,
+                        static_cast<uint16_t>(collision["collision"].toInt()),
+                        static_cast<uint16_t>(collision["elevation"].toInt()),
+                        static_cast<uint16_t>(collision["cliff_collision"].toInt()),
+                        static_cast<uint16_t>(collision["biome"].toInt()),
+                        static_cast<uint16_t>(collision["bg_material"].toInt())});
                 }
                 // Older clipboard data has no location array; default to -1 (active location).
                 for (QJsonValue location : locationsArray) {
@@ -3475,20 +3485,24 @@ void MainWindow::on_horizontalSlider_MetatileZoom_valueChanged(int value) {
     scrollMetatileSelectorToSelection();
 }
 
-void MainWindow::on_horizontalSlider_CollisionZoom_valueChanged(int value) {
-    porymapConfig.collisionZoom = value;
-    double scale = pow(3.0, static_cast<double>(value - 30) / 30.0);
+// Toggles the Elevation tab between painting collision (impassable) and elevation levels.
+void MainWindow::on_checkBox_PaintCollision_toggled(bool on) {
+    if (this->editor && this->editor->movement_permissions_selector_item)
+        this->editor->movement_permissions_selector_item->setPaintCollision(on);
+}
 
-    QTransform transform;
-    transform.scale(scale, scale);
-    QSize size(editor->movement_permissions_selector_item->pixmap().width(),
-               editor->movement_permissions_selector_item->pixmap().height());
-    size *= scale;
+// Toggles painting the cliff-collision bit (walls off the behind-cliff region). Painted
+// independently of normal collision; painting normal collision also sets it.
+void MainWindow::on_checkBox_PaintCliffCollision_toggled(bool on) {
+    if (this->editor && this->editor->movement_permissions_selector_item)
+        this->editor->movement_permissions_selector_item->setPaintCliffCollision(on);
+}
 
-    ui->graphicsView_CollisionSelector->setResizeAnchor(QGraphicsView::NoAnchor);
-    ui->graphicsView_CollisionSelector->setTransform(transform);
-    ui->graphicsView_CollisionSelector->setFixedSize(size.width() + 2, size.height() + 2);
-    ui->scrollAreaWidgetContents_Collision->adjustSize();
+// Toggles "paint bgMaterial only": painting/filling changes only the bgMaterial attribute
+// and leaves the underlying metatile untouched.
+void MainWindow::on_checkBox_PaintBgMaterialOnly_toggled(bool on) {
+    if (this->editor && this->editor->bgMaterial_selector_item)
+        this->editor->bgMaterial_selector_item->setPaintOnly(on);
 }
 
 void MainWindow::on_horizontalSlider_LocationZoom_valueChanged(int value) {

@@ -41,6 +41,7 @@ public:
     QSize pixelSize() const { return QSize(pixelWidth(), pixelHeight()); }
 
     QString border_path;
+    QString border_attributes_path;
     QString blockdata_path;
     QString attributes_path;
 
@@ -181,11 +182,13 @@ public:
 
     uint16_t getBorderMetatileId(int x, int y);
     void setBorderMetatileId(int x, int y, uint16_t metatileId, bool enableScriptCallback = false);
+    uint16_t getBorderBgMaterial(int x, int y);
+    void setBorderBgMaterial(int x, int y, uint16_t bgMaterial);
     void setBorderBlockData(Blockdata blockdata, bool enableScriptCallback = false);
 
-    void floodFillCollisionElevation(int x, int y, uint16_t collision, uint16_t elevation);
-    void _floodFillCollisionElevation(int x, int y, uint16_t collision, uint16_t elevation);
-    void magicFillCollisionElevation(int x, int y, uint16_t collision, uint16_t elevation);
+    void floodFillCollisionElevation(int x, int y, uint16_t collision, uint16_t cliffCollision, uint16_t elevation);
+    void _floodFillCollisionElevation(int x, int y, uint16_t collision, uint16_t cliffCollision, uint16_t elevation);
+    void magicFillCollisionElevation(int x, int y, uint16_t collision, uint16_t cliffCollision, uint16_t elevation);
 
     void floodFillLocation(int x, int y, uint16_t location);
     void _floodFillLocation(int x, int y, uint16_t location);

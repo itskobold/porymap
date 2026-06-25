@@ -97,7 +97,6 @@
         <file>icons/ui/midnight/radio_unchecked.png</file>
         <file>icons/ui/midnight/radio_unchecked@2x.png</file>
         <file>images/blank_tileset.png</file>
-        <file>images/collisions.png</file>
         <file>images/collisions_unknown.png</file>
         <file>images/elevation_tile.png</file>
         <file>images/locations.png</file>

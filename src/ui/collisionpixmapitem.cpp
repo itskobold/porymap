@@ -29,6 +29,11 @@ void CollisionPixmapItem::paint(QGraphicsSceneMouseEvent *event) {
 
         Block block;
         if (this->layout->getBlock(pos.x(), pos.y(), &block)) {
+            bool collision = this->selector->paintCollision();
+            // Painting normal collision also sets cliff collision; cliff can be painted alone.
+            bool cliffCollision = collision || this->selector->paintCliffCollision();
+            block.setCollision(collision ? 1 : 0);
+            block.setCliffCollision(cliffCollision ? 1 : 0);
             block.setElevation(this->selector->selectedValue());
             this->layout->setBlock(pos.x(), pos.y(), block, true);
         }
@@ -46,7 +51,9 @@ void CollisionPixmapItem::floodFill(QGraphicsSceneMouseEvent *event) {
         Blockdata oldCollision = this->layout->blockdata;
 
         QPoint pos = Metatile::coordFromPixmapCoord(event->pos());
-        this->layout->floodFillCollisionElevation(pos.x(), pos.y(), 0, this->selector->selectedValue());
+        bool collision = this->selector->paintCollision();
+        bool cliffCollision = collision || this->selector->paintCliffCollision();
+        this->layout->floodFillCollisionElevation(pos.x(), pos.y(), collision ? 1 : 0, cliffCollision ? 1 : 0, this->selector->selectedValue());
 
         if (this->layout->blockdata != oldCollision) {
             this->layout->editHistory.push(new BucketFillCollision(this->layout, oldCollision, this->layout->blockdata));
@@ -60,7 +67,9 @@ void CollisionPixmapItem::magicFill(QGraphicsSceneMouseEvent *event) {
     } else if (this->layout) {
         Blockdata oldCollision = this->layout->blockdata;
         QPoint pos = Metatile::coordFromPixmapCoord(event->pos());
-        this->layout->magicFillCollisionElevation(pos.x(), pos.y(), 0, this->selector->selectedValue());
+        bool collision = this->selector->paintCollision();
+        bool cliffCollision = collision || this->selector->paintCliffCollision();
+        this->layout->magicFillCollisionElevation(pos.x(), pos.y(), collision ? 1 : 0, cliffCollision ? 1 : 0, this->selector->selectedValue());
 
         if (this->layout->blockdata != oldCollision) {
             this->layout->editHistory.push(new MagicFillCollision(this->layout, oldCollision, this->layout->blockdata));

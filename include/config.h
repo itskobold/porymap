@@ -214,6 +214,8 @@ enum ProjectIdentifier {
     define_mask_elevation,
     define_mask_location,
     define_mask_biome,
+    define_mask_cliff_collision,
+    define_mask_bgmaterial,
     define_mask_behavior,
     define_mask_layer,
     define_attribute_behavior,
@@ -330,17 +332,17 @@ public:
         this->collisionSheetSize = QSize(5, 1);
         this->playerViewDistance = QMargins(GBA_H_DIST_TO_CENTER, GBA_V_DIST_TO_CENTER, GBA_H_DIST_TO_CENTER, GBA_V_DIST_TO_CENTER);
         // Split metatile-id/attributes format: the map.bin word packs metatile id
-        // (bits 0-9), location (bits 10-11) and biome (bits 12-15). The per-tile attribute
-        // byte holds a single elevation value (bits 0-6); there is no collision bit, so the
-        // collision mask is empty. Special elevation values give a tile its movement
-        // semantics: 0 = elevation change, 1 = impassable, 2 = water, 3 = multi-level,
-        // 4+ = ordinary elevation levels. (Engine bit 7 is a runtime-only collision flag,
-        // never present in committed data.)
+        // (bits 0-9), location (bits 10-11) and biome (bits 12-15). The per-tile 16-bit
+        // attribute value (attributes.bin, 2 bytes/tile) holds an 8-bit elevation level
+        // (bits 0-7), cliff collision (bit 8), collision (bit 9) and bgMaterial (bits 10-13).
+        // There are no special elevation values. (Overridden from the project headers.)
         this->blockMetatileIdMask = 0x03FF;
-        this->blockCollisionMask = 0x00;
-        this->blockElevationMask = 0x7F;
+        this->blockCollisionMask = 0x0200;
+        this->blockCliffCollisionMask = 0x0100;
+        this->blockElevationMask = 0x00FF;
         this->blockLocationMask = 0x0C00;
         this->blockBiomeMask = 0xF000;
+        this->blockBgMaterialMask = 0x3C00;
         this->unusedTileNormal = 0x3014;
         this->unusedTileCovered = 0x0000;
         this->unusedTileSplit = 0x0000;
@@ -414,9 +416,11 @@ public:
     uint32_t metatileLayerTypeMask;
     uint16_t blockMetatileIdMask;
     uint16_t blockCollisionMask;
+    uint16_t blockCliffCollisionMask;
     uint16_t blockElevationMask;
     uint16_t blockLocationMask;
     uint16_t blockBiomeMask;
+    uint16_t blockBgMaterialMask;
     uint16_t unusedTileNormal;
     uint16_t unusedTileCovered;
     uint16_t unusedTileSplit;

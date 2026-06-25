@@ -29,6 +29,7 @@ void Layout::copyFrom(const Layout *other) {
     this->border_width = other->border_width;
     this->border_height = other->border_height;
     this->border_path = other->border_path;
+    this->border_attributes_path = other->border_attributes_path;
     this->blockdata_path = other->blockdata_path;
     this->attributes_path = other->attributes_path;
     this->tileset_primary_label = other->tileset_primary_label;
@@ -287,6 +288,17 @@ void Layout::setBorderMetatileId(int x, int y, uint16_t metatileId, bool enableS
     }
 }
 
+uint16_t Layout::getBorderBgMaterial(int x, int y) {
+    int i = y * getBorderWidth() + x;
+    return (i < this->border.size()) ? this->border[i].bgMaterial() : 0;
+}
+
+void Layout::setBorderBgMaterial(int x, int y, uint16_t bgMaterial) {
+    int i = y * getBorderWidth() + x;
+    if (i < this->border.size())
+        this->border[i].setBgMaterial(bgMaterial);
+}
+
 void Layout::setBorderBlockData(Blockdata newBlockdata, bool enableScriptCallback) {
     int width = getBorderWidth();
     int size = qMin(newBlockdata.size(), this->border.size());
@@ -388,7 +400,7 @@ void Layout::setNewBorderDimensionsBlockdata(int newWidth, int newHeight) {
     this->border = newBlockdata;
 }
 
-void Layout::_floodFillCollisionElevation(int x, int y, uint16_t collision, uint16_t elevation) {
+void Layout::_floodFillCollisionElevation(int x, int y, uint16_t collision, uint16_t cliffCollision, uint16_t elevation) {
     QList<QPoint> todo;
     todo.append(QPoint(x, y));
     while (todo.length()) {
@@ -401,46 +413,53 @@ void Layout::_floodFillCollisionElevation(int x, int y, uint16_t collision, uint
         }
 
         uint old_coll = block.collision();
+        uint old_cliff = block.cliffCollision();
         uint old_elev = block.elevation();
-        if (old_coll == collision && old_elev == elevation) {
+        if (old_coll == collision && old_cliff == cliffCollision && old_elev == elevation) {
             continue;
         }
 
         block.setCollision(collision);
+        block.setCliffCollision(cliffCollision);
         block.setElevation(elevation);
         setBlock(x, y, block, true);
-        if (getBlock(x + 1, y, &block) && block.collision() == old_coll && block.elevation() == old_elev) {
+        auto matches = [&](const Block &b) {
+            return b.collision() == old_coll && b.cliffCollision() == old_cliff && b.elevation() == old_elev;
+        };
+        if (getBlock(x + 1, y, &block) && matches(block)) {
             todo.append(QPoint(x + 1, y));
         }
-        if (getBlock(x - 1, y, &block) && block.collision() == old_coll && block.elevation()== old_elev) {
+        if (getBlock(x - 1, y, &block) && matches(block)) {
             todo.append(QPoint(x - 1, y));
         }
-        if (getBlock(x, y + 1, &block) && block.collision() == old_coll && block.elevation() == old_elev) {
+        if (getBlock(x, y + 1, &block) && matches(block)) {
             todo.append(QPoint(x, y + 1));
         }
-        if (getBlock(x, y - 1, &block) && block.collision() == old_coll && block.elevation() == old_elev) {
+        if (getBlock(x, y - 1, &block) && matches(block)) {
             todo.append(QPoint(x, y - 1));
         }
     }
 }
 
-void Layout::floodFillCollisionElevation(int x, int y, uint16_t collision, uint16_t elevation) {
+void Layout::floodFillCollisionElevation(int x, int y, uint16_t collision, uint16_t cliffCollision, uint16_t elevation) {
     Block block;
-    if (getBlock(x, y, &block) && (block.collision() != collision || block.elevation() != elevation)) {
-        _floodFillCollisionElevation(x, y, collision, elevation);
+    if (getBlock(x, y, &block) && (block.collision() != collision || block.cliffCollision() != cliffCollision || block.elevation() != elevation)) {
+        _floodFillCollisionElevation(x, y, collision, cliffCollision, elevation);
     }
 }
 
-void Layout::magicFillCollisionElevation(int initialX, int initialY, uint16_t collision, uint16_t elevation) {
+void Layout::magicFillCollisionElevation(int initialX, int initialY, uint16_t collision, uint16_t cliffCollision, uint16_t elevation) {
     Block block;
-    if (getBlock(initialX, initialY, &block) && (block.collision() != collision || block.elevation() != elevation)) {
+    if (getBlock(initialX, initialY, &block) && (block.collision() != collision || block.cliffCollision() != cliffCollision || block.elevation() != elevation)) {
         uint old_coll = block.collision();
+        uint old_cliff = block.cliffCollision();
         uint old_elev = block.elevation();
 
         for (int y = 0; y < getHeight(); y++) {
             for (int x = 0; x < getWidth(); x++) {
-                if (getBlock(x, y, &block) && block.collision() == old_coll && block.elevation() == old_elev) {
+                if (getBlock(x, y, &block) && block.collision() == old_coll && block.cliffCollision() == old_cliff && block.elevation() == old_elev) {
                     block.setCollision(collision);
+                    block.setCliffCollision(cliffCollision);
                     block.setElevation(elevation);
                     setBlock(x, y, block, true);
                 }
@@ -609,19 +628,34 @@ QPixmap Layout::render(bool ignoreCache, Layout *fromLayout, const QRect &bounds
         const Block block = this->blockdata.at(i);
         uint16_t metatileId = block.metatileId();
         const bool isSecondary = Layout::metatileIsSecondary(metatileId);
-        const quint32 cacheKey = isSecondary
+        const Tileset *secondaryForTile = isSecondary ? src->secondaryTilesetForLocation(block.location()) : src->tileset_secondary;
+        // Only metatiles flagged "use bg material" take the bgMaterial render path.
+        const Metatile *tileMetatile = Tileset::getMetatile(metatileId, src->tileset_primary, secondaryForTile);
+        const bool useBgMaterial = tileMetatile && tileMetatile->usesBgMaterial();
+        uint16_t bgMaterial = useBgMaterial ? block.bgMaterial() : 0;
+        // A bgMaterial tile's appearance also depends on the material metatile, so fold it
+        // into the cache key (bits 24+, above metatile id and location). Flagged-ness is a
+        // property of metatileId, so flagged/unflagged tiles never share a key.
+        quint32 cacheKey = isSecondary
                 ? (static_cast<quint32>(metatileId) | (static_cast<quint32>(block.location()) << 16))
                 : static_cast<quint32>(metatileId);
+        cacheKey |= static_cast<quint32>(bgMaterial) << 24;
         QImage metatileImage;
         if (imageCache.contains(cacheKey)) {
             metatileImage = imageCache.value(cacheKey);
         } else {
+            // bgMaterial selects a primary metatile (0-15) whose bottom layer replaces this tile's.
+            const Metatile *materialMetatile = useBgMaterial
+                    ? Tileset::getMetatile(bgMaterial, src->tileset_primary, src->tileset_secondary)
+                    : nullptr;
             metatileImage = getMetatileImage(
                 metatileId,
                 src->tileset_primary,
-                isSecondary ? src->secondaryTilesetForLocation(block.location()) : src->tileset_secondary,
+                secondaryForTile,
                 metatileLayerOrder(),
-                metatileLayerOpacity()
+                metatileLayerOpacity(),
+                false,
+                materialMetatile
             );
             imageCache.insert(cacheKey, metatileImage);
         }
@@ -810,12 +844,19 @@ QPixmap Layout::renderBorder(bool ignoreCache) {
         changed_any = true;
         Block block = this->border.at(i);
         uint16_t metatileId = block.metatileId();
+        const Tileset *secondary = Layout::metatileIsSecondary(metatileId) ? secondaryTilesetForLocation(block.location()) : this->tileset_secondary;
+        // Border tiles flagged "use bg material" render with their bgMaterial, just like map tiles.
+        const Metatile *tileMetatile = Tileset::getMetatile(metatileId, this->tileset_primary, secondary);
+        const Metatile *materialMetatile = (tileMetatile && tileMetatile->usesBgMaterial())
+                ? Tileset::getMetatile(block.bgMaterial(), this->tileset_primary, this->tileset_secondary) : nullptr;
         QImage metatile_image = getMetatileImage(
                 metatileId,
                 this->tileset_primary,
-                Layout::metatileIsSecondary(metatileId) ? secondaryTilesetForLocation(block.location()) : this->tileset_secondary,
+                secondary,
                 metatileLayerOrder(),
-                metatileLayerOpacity());
+                metatileLayerOpacity(),
+                false,
+                materialMetatile);
         int x = this->border_width ? ((i % this->border_width) * Metatile::pixelWidth()) : 0;
         int y = this->border_width ? ((i / this->border_width) * Metatile::pixelHeight()) : 0;
         painter.drawImage(x, y, metatile_image);
@@ -860,7 +901,14 @@ bool Layout::save(const QString &root) {
 
 bool Layout::saveBorder(const QString &root) {
     QString path = QString("%1/%2").arg(root).arg(this->border_path);
-    return writeBlockdata(path, this->border);
+    if (!writeBlockdata(path, this->border))
+        return false;
+
+    // Border per-tile attributes (bgMaterial) are stored alongside the border blockdata.
+    if (this->border_attributes_path.isEmpty())
+        return true;
+    QString attributesPath = QString("%1/%2").arg(root).arg(this->border_attributes_path);
+    return writeAttributes(attributesPath, this->border);
 }
 
 bool Layout::saveBlockdata(const QString &root) {
@@ -929,6 +977,17 @@ bool Layout::loadBorder(const QString &root) {
                 .arg(this->border_height)
                 .arg(expectedSize));
         this->border.resize(expectedSize);
+    }
+
+    // Border per-tile attributes (bgMaterial) are stored separately, like the main blockdata's.
+    // A missing file is non-fatal: attributes default to 0.
+    if (!this->border_attributes_path.isEmpty()) {
+        QString attrError;
+        QString attrPath = QString("%1/%2").arg(root).arg(this->border_attributes_path);
+        if (QFile::exists(attrPath))
+            readAttributes(attrPath, &this->border, &attrError);
+        if (!attrError.isEmpty())
+            logWarn(QString("Failed to load border attributes for %1 from '%2': %3").arg(this->name).arg(attrPath).arg(attrError));
     }
 
     this->lastCommitBlocks.border = this->border;
@@ -1001,7 +1060,8 @@ Blockdata Layout::readBlockdata(const QString &path, QString *error) {
     return blockdata;
 }
 
-// Reads the per-tile attribute byte (collision + elevation) for each block, in order.
+// Reads the per-tile 16-bit attribute value (elevation, collision, cliff collision,
+// bgMaterial) for each block, in order. attributes.bin stores 2 bytes/tile, little-endian.
 void Layout::readAttributes(const QString &path, Blockdata *blockdata, QString *error) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
@@ -1010,12 +1070,16 @@ void Layout::readAttributes(const QString &path, Blockdata *blockdata, QString *
     }
 
     QByteArray data = file.readAll();
-    if (data.length() < blockdata->count()) {
+    if (data.length() < blockdata->count() * 2) {
         logWarn(QString("Attributes length %1 is shorter than blockdata length %2 in '%3'. Missing attributes default to 0.")
-                .arg(data.length()).arg(blockdata->count()).arg(path));
+                .arg(data.length()).arg(blockdata->count() * 2).arg(path));
     }
     for (int i = 0; i < blockdata->count(); i++) {
-        uint8_t attr = (i < data.length()) ? static_cast<uint8_t>(data[i] & 0xff) : 0;
+        int lo = i * 2;
+        int hi = lo + 1;
+        uint16_t attr = static_cast<uint16_t>(
+                ((lo < data.length()) ? static_cast<uint8_t>(data[lo] & 0xff) : 0)
+              | ((hi < data.length()) ? (static_cast<uint8_t>(data[hi] & 0xff) << 8) : 0));
         (*blockdata)[i].setAttributes(attr);
     }
 }

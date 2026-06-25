@@ -32,6 +32,7 @@ public:
         TerrainType,
         EncounterType,
         LayerType,
+        BgMaterial, // 1-bit flag: gate the bgMaterial render path for this metatile
         Unused, // Preserve bits not used by the other attributes
     };
 
@@ -49,10 +50,12 @@ public:
     uint32_t terrainType()   const { return this->getAttribute(Attr::TerrainType); }
     uint32_t encounterType() const { return this->getAttribute(Attr::EncounterType); }
     uint32_t layerType()     const { return this->getAttribute(Attr::LayerType); }
+    bool usesBgMaterial()    const { return this->getAttribute(Attr::BgMaterial) != 0; }
     void setBehavior(int value)      { this->setAttribute(Attr::Behavior, static_cast<uint32_t>(value)); }
     void setTerrainType(int value)   { this->setAttribute(Attr::TerrainType, static_cast<uint32_t>(value)); }
     void setEncounterType(int value) { this->setAttribute(Attr::EncounterType, static_cast<uint32_t>(value)); }
     void setLayerType(int value)     { this->setAttribute(Attr::LayerType, static_cast<uint32_t>(value)); }
+    void setUsesBgMaterial(bool on)  { this->setAttribute(Attr::BgMaterial, on ? 1 : 0); }
 
     static int getIndexInTileset(int);
     static QPoint coordFromPixmapCoord(const QPointF &pixelCoord);

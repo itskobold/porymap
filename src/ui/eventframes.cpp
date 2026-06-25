@@ -67,6 +67,18 @@ void EventFrame::setup() {
     l_layout_z->addWidget(this->spinner_z);
 
     l_layout_xyz->addLayout(l_layout_z);
+
+    // "any elevation" flag: event interacts with the player regardless of elevation
+    // (for object events it also forces always-on-top rendering). Not used by heal
+    // locations or clone events, so hide it there.
+    this->check_any_elevation = new QCheckBox("any", this);
+    this->check_any_elevation->setToolTip("Interact with the player at any elevation (ignore the elevation above).\n"
+                                           "For object events this also draws the object on top at all times.");
+    l_layout_z->addWidget(this->check_any_elevation);
+    Event::Group group = this->event->getEventGroup();
+    if (group == Event::Group::Heal || this->event->getEventType() == Event::Type::CloneObject)
+        this->check_any_elevation->setVisible(false);
+
     l_layout_xyz->addItem(createSpacerH());
 
     QVBoxLayout *l_vbox_1 = new QVBoxLayout();
@@ -131,6 +143,12 @@ void EventFrame::connectSignals(MainWindow *) {
         this->event->modify();
     });
 
+    this->check_any_elevation->disconnect();
+    connect(this->check_any_elevation, &QCheckBox::toggled, [this](bool checked) {
+        this->event->setAnyElevation(checked);
+        this->event->modify();
+    });
+
     this->custom_attributes->disconnect();
     connect(this->custom_attributes->table(), &CustomAttributesTable::edited, [this]() {
         this->event->setCustomAttributes(this->custom_attributes->table()->getAttributes());
@@ -146,6 +164,7 @@ void EventFrame::initialize() {
     this->spinner_x->setValue(this->event->getX());
     this->spinner_y->setValue(this->event->getY());
     this->spinner_z->setValue(this->event->getZ());
+    this->check_any_elevation->setChecked(this->event->getAnyElevation());
 
     this->custom_attributes->table()->setAttributes(this->event->getCustomAttributes());
 

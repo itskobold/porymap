@@ -24,6 +24,7 @@
 #include "collisionpixmapitem.h"
 #include "locationpixmapitem.h"
 #include "biomepixmapitem.h"
+#include "bgmaterialselector.h"
 #include "layoutpixmapitem.h"
 #include "settings.h"
 #include "gridsettings.h"
@@ -73,6 +74,7 @@ public:
     bool displayLayout();
 
     void displayMetatileSelector();
+    void displayBgMaterialSelector();
     void displayMapMetatiles();
     void displayMapMovementPermissions();
     void displayMapLocations();
@@ -165,7 +167,9 @@ public:
     QPointer<QGraphicsScene> scene_collision_metatiles = nullptr;
     QPointer<QGraphicsScene> scene_location_metatiles = nullptr;
     QPointer<QGraphicsScene> scene_biome_metatiles = nullptr;
+    QPointer<QGraphicsScene> scene_bgMaterial = nullptr;
     QPointer<MetatileSelector> metatile_selector_item = nullptr;
+    QPointer<BgMaterialSelector> bgMaterial_selector_item = nullptr;
 
     QPointer<BorderMetatilesPixmapItem> selected_border_metatiles_item = nullptr;
     CurrentSelectedMetatilesPixmapItem *current_metatile_selection_item = nullptr;
@@ -195,7 +199,6 @@ public:
     qreal collisionOpacity = 0.5;
     qreal locationOpacity = 0.5;
     qreal biomeOpacity = 0.5;
-    static QList<const QImage*> collisionIcons;
     static QList<const QImage*> locationIcons;
     static QList<const QImage*> locationOobIcons;
     static QList<const QImage*> biomeIcons;
@@ -255,8 +258,6 @@ public slots:
     void toggleGrid(bool);
 
 private:
-    const QImage defaultCollisionImgSheet = QImage(":/images/collisions.png");
-    const QImage collisionPlaceholder = QImage(":/images/collisions_unknown.png");
     QPixmap collisionSheetPixmap;
 
     const QImage defaultLocationImgSheet = QImage(":/images/locations.png");

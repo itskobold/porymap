@@ -618,6 +618,7 @@ Layout *Project::createNewLayout(const Layout::Settings &settings, const Layout 
     const QString folderPath = projectConfig.getFilePath(ProjectFilePath::data_layouts_folders) + folderName;
     layout->newFolderPath = folderPath;
     layout->border_path = folderPath + "/border.bin";
+    layout->border_attributes_path = folderPath + "/border_attributes.bin";
     layout->blockdata_path = folderPath + "/map.bin";
     layout->attributes_path = folderPath + "/attributes.bin";
 
@@ -731,6 +732,8 @@ bool Project::readMapLayouts() {
         } else {
             layout->attributes_path = layout->blockdata_path.left(layout->blockdata_path.lastIndexOf('/') + 1) + "attributes.bin";
         }
+        // Border per-tile attributes (bgMaterial) live alongside border.bin.
+        layout->border_attributes_path = layout->border_path.left(layout->border_path.lastIndexOf('/') + 1) + "border_attributes.bin";
 
         layout->customData = layoutObj;
 
@@ -2554,6 +2557,8 @@ bool Project::readFieldmapMasks() {
     const QString elevationMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_elevation);
     const QString locationMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_location);
     const QString biomeMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_biome);
+    const QString cliffCollisionMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_cliff_collision);
+    const QString bgMaterialMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_bgmaterial);
     const QString behaviorMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_behavior);
     const QString layerTypeMaskName = projectConfig.getIdentifier(ProjectIdentifier::define_mask_layer);
 
@@ -2563,6 +2568,8 @@ bool Project::readFieldmapMasks() {
                                                                      elevationMaskName,
                                                                      locationMaskName,
                                                                      biomeMaskName,
+                                                                     cliffCollisionMaskName,
+                                                                     bgMaterialMaskName,
                                                                      behaviorMaskName,
                                                                      layerTypeMaskName,
     });
@@ -2600,6 +2607,10 @@ bool Project::readFieldmapMasks() {
         projectConfig.blockLocationMask = blockMask;
     if (readBlockMask(biomeMaskName, &blockMask))
         projectConfig.blockBiomeMask = blockMask;
+    if (readBlockMask(cliffCollisionMaskName, &blockMask))
+        projectConfig.blockCliffCollisionMask = blockMask;
+    if (readBlockMask(bgMaterialMaskName, &blockMask))
+        projectConfig.blockBgMaterialMask = blockMask;
     Block::setLayout();
 
     // Read RSE metatile attribute masks

@@ -34,6 +34,11 @@ public:
 
     MetatileSelector *metatileSelector;
 
+    // Picker for the per-tile bgMaterial attribute (may be null). When set, painting/filling
+    // stamps its selected value onto every painted tile; in "paint only" mode the metatile is
+    // left unchanged and only bgMaterial is written. Owned by the Editor.
+    class BgMaterialSelector *bgMaterialSelector = nullptr;
+
     Settings *settings;
 
     bool active;

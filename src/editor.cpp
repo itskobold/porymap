@@ -23,9 +23,6 @@
 
 static bool selectNewEvents = false;
 
-// Icons for the special elevation values (elevation change, impassable, water,
-// multi-level), indexed by value. Ordinary elevation levels are drawn procedurally.
-QList<const QImage*> Editor::collisionIcons;
 
 // Array mapping location values to an icon.
 QList<const QImage*> Editor::locationIcons;
@@ -85,7 +82,6 @@ Editor::~Editor()
     delete this->playerViewRect;
     delete this->cursorMapTileRect;
     delete this->map_ruler;
-    qDeleteAll(collisionIcons);
     qDeleteAll(locationIcons);
     qDeleteAll(locationOobIcons);
     qDeleteAll(biomeIcons);
@@ -1315,14 +1311,7 @@ void Editor::setStatusFromMapPos(const QPoint &pos) {
 }
 
 QString Editor::getMovementPermissionText(uint16_t value) {
-    switch (value) {
-    case Elevation::ElevationChange: return "Elevation: Transition between elevations";
-    case Elevation::Impassable:      return "Elevation: Impassable";
-    case Elevation::Water:           return "Elevation: Surfable Water";
-    case Elevation::MultiLevel:      return "Elevation: Multi-Level (Bridge)";
-    default:
-        return QString("Elevation: Level %1").arg(value - Elevation::FirstLevel);
-    }
+    return QString("Elevation: Level %1").arg(value);
 }
 
 void Editor::unsetMap() {
@@ -1655,6 +1644,7 @@ bool Editor::displayLayout() {
     }
 
     displayMetatileSelector();
+    displayBgMaterialSelector();
     displayMapMetatiles();
     displayMovementPermissionSelector();
     displayMapMovementPermissions();
@@ -1712,6 +1702,33 @@ void Editor::displayMetatileSelector() {
     scene_metatiles->addItem(metatile_selector_item);
 }
 
+void Editor::displayBgMaterialSelector() {
+    if (bgMaterial_selector_item && bgMaterial_selector_item->scene())
+        bgMaterial_selector_item->scene()->removeItem(bgMaterial_selector_item);
+    delete scene_bgMaterial;
+
+    scene_bgMaterial = new QGraphicsScene;
+    if (!bgMaterial_selector_item) {
+        bgMaterial_selector_item = new BgMaterialSelector(this->layout);
+        bgMaterial_selector_item->setSelectedBgMaterial(0);
+        // Keep the metatile picker's bg-material preview in sync with the selected material.
+        if (metatile_selector_item) {
+            connect(bgMaterial_selector_item, &BgMaterialSelector::selectedBgMaterialChanged,
+                    metatile_selector_item, &MetatileSelector::setSelectedBgMaterial);
+            metatile_selector_item->setSelectedBgMaterial(bgMaterial_selector_item->selectedBgMaterial());
+        }
+        // Refresh the current-selection preview so it previews with the new material too.
+        connect(bgMaterial_selector_item, &BgMaterialSelector::selectedBgMaterialChanged, this, [this]() {
+            if (current_metatile_selection_item)
+                current_metatile_selection_item->draw();
+        });
+    } else {
+        bgMaterial_selector_item->setLayout(this->layout);
+    }
+    bgMaterial_selector_item->draw();
+    scene_bgMaterial->addItem(bgMaterial_selector_item);
+}
+
 void Editor::clearMapMetatiles() {
     if (map_item && scene) {
         scene->removeItem(map_item);
@@ -1724,6 +1741,7 @@ void Editor::displayMapMetatiles() {
 
     map_item = new LayoutPixmapItem(this->layout, this->metatile_selector_item, this->settings);
     map_item->map = this->map;
+    map_item->bgMaterialSelector = this->bgMaterial_selector_item;
     connect(map_item, &LayoutPixmapItem::mouseEvent, this, &Editor::mouseEvent_map);
     connect(map_item, &LayoutPixmapItem::startPaint, this, &Editor::onMapStartPaint);
     connect(map_item, &LayoutPixmapItem::endPaint, this, &Editor::onMapEndPaint);
@@ -2779,53 +2797,7 @@ void Editor::updateLocationLimit() {
         this->location_item->draw(true);
 }
 
-// Custom collision graphics may be provided by the user.
+// Collision and elevation tiles are drawn procedurally (see imageproviders.cpp); there is
+// no collision image sheet or picker to build.
 void Editor::setCollisionGraphics() {
-    QString filepath = projectConfig.collisionSheetPath;
-
-    QImage imgSheet;
-    if (filepath.isEmpty()) {
-        // No custom collision image specified, use the default.
-        imgSheet = this->defaultCollisionImgSheet;
-    } else {
-        // Try to load custom collision image
-        QString validPath = Project::getExistingFilepath(filepath);
-        if (!validPath.isEmpty()) filepath = validPath; // Otherwise allow it to fail with the original path
-        imgSheet = QImage(filepath);
-        if (imgSheet.isNull()) {
-            // Custom collision image failed to load, use default
-            logWarn(QString("Failed to load custom collision image '%1', using default.").arg(filepath));
-            imgSheet = this->defaultCollisionImgSheet;
-        }
-    }
-
-    // Users are not required to provide an image that gives an icon for every elevation/collision combination.
-    // Instead they tell us how many are provided in their image by specifying the number of columns and rows.
-    const int imgColumns = projectConfig.collisionSheetSize.width();
-    const int imgRows = projectConfig.collisionSheetSize.height();
-
-    // Create a pixmap for the selector on the Collision tab. If a project was previously opened we'll also need to refresh the selector.
-    this->collisionSheetPixmap = QPixmap::fromImage(imgSheet).scaled(MovementPermissionsSelector::CellWidth * imgColumns,
-                                                                     MovementPermissionsSelector::CellHeight * imgRows);
-    if (this->movement_permissions_selector_item)
-        this->movement_permissions_selector_item->setBasePixmap(this->collisionSheetPixmap);
-
-    qDeleteAll(collisionIcons);
-    collisionIcons.clear();
-
-    // The collision sheet is a horizontal strip of cells. The first Elevation::NumSpecial
-    // cells are the icons for the special elevation values (elevation change, impassable,
-    // water, multi-level); the final "all levels" cell is only shown in the picker (ordinary
-    // elevation levels are drawn procedurally on the map). Build an on-map icon for each
-    // special value here.
-    const int w = Metatile::pixelWidth(), h = Metatile::pixelHeight();
-    imgSheet = imgSheet.scaled(w * imgColumns, h * imgRows);
-    for (int value = 0; value < Elevation::NumSpecial; value++) {
-        if (value < imgColumns) {
-            collisionIcons.append(new QImage(imgSheet.copy(value * w, 0, w, h)));
-        } else {
-            // This special value has no icon on the image sheet; use a placeholder.
-            collisionIcons.append(new QImage(this->collisionPlaceholder.copy(0, 0, w, h)));
-        }
-    }
 }

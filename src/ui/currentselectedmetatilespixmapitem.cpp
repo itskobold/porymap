@@ -2,7 +2,7 @@
 #include "imageproviders.h"
 #include <QPainter>
 
-QPixmap drawMetatileSelection(MetatileSelection selection, Layout *layout) {
+QPixmap drawMetatileSelection(MetatileSelection selection, Layout *layout, int selectedBgMaterial) {
     int width = selection.dimensions.width() * Metatile::pixelWidth();
     int height = selection.dimensions.height() * Metatile::pixelHeight();
     QImage image(width, height, QImage::Format_RGBA8888);
@@ -20,14 +20,16 @@ QPixmap drawMetatileSelection(MetatileSelection selection, Layout *layout) {
                 // Tiles picked off the map carry their source location, so render secondary
                 // metatiles with that location's secondary tileset (matching the canvas)
                 // rather than the active location's.
-                QImage metatile_image;
-                if (item.location >= 0 && Layout::metatileIsSecondary(item.metatileId)) {
-                    metatile_image = getMetatileImage(item.metatileId, layout->tileset_primary,
-                                                      layout->secondaryTilesetForLocation(item.location),
-                                                      layout->metatileLayerOrder(), layout->metatileLayerOpacity());
-                } else {
-                    metatile_image = getMetatileImage(item.metatileId, layout);
-                }
+                const Tileset *secondary = (item.location >= 0 && Layout::metatileIsSecondary(item.metatileId))
+                        ? layout->secondaryTilesetForLocation(item.location) : layout->tileset_secondary;
+                // Flagged metatiles preview with the selected bg material (matches the picker).
+                // selectedBgMaterial < 0 means no material context.
+                const Metatile *metatile = Tileset::getMetatile(item.metatileId, layout->tileset_primary, secondary);
+                const Metatile *materialMetatile = (selectedBgMaterial >= 0 && metatile && metatile->usesBgMaterial())
+                        ? Tileset::getMetatile(selectedBgMaterial, layout->tileset_primary, secondary) : nullptr;
+                QImage metatile_image = getMetatileImage(item.metatileId, layout->tileset_primary, secondary,
+                                                         layout->metatileLayerOrder(), layout->metatileLayerOpacity(),
+                                                         false, materialMetatile);
                 painter.drawImage(metatile_origin, metatile_image);
             }
         }
@@ -39,5 +41,5 @@ QPixmap drawMetatileSelection(MetatileSelection selection, Layout *layout) {
 
 void CurrentSelectedMetatilesPixmapItem::draw() {
     MetatileSelection selection = metatileSelector->getMetatileSelection();
-    setPixmap(drawMetatileSelection(selection, this->layout));
+    setPixmap(drawMetatileSelection(selection, this->layout, metatileSelector->selectedBgMaterial()));
 }

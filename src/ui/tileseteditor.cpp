@@ -163,6 +163,7 @@ void TilesetEditor::initAttributesUi() {
     connect(ui->comboBox_EncounterType,     &NoScrollComboBox::editingFinished, this, &TilesetEditor::commitEncounterType);
     connect(ui->comboBox_TerrainType,       &NoScrollComboBox::editingFinished, this, &TilesetEditor::commitTerrainType);
     connect(ui->comboBox_LayerType,         &NoScrollComboBox::editingFinished, this, &TilesetEditor::commitLayerType);
+    connect(ui->checkBox_BgMaterial,        &QCheckBox::toggled, this, &TilesetEditor::commitBgMaterial);
 
     // Behavior
     if (projectConfig.metatileBehaviorMask) {
@@ -212,6 +213,10 @@ void TilesetEditor::initAttributesUi() {
         this->ui->frame_LayerType->setVisible(false);
         this->ui->label_BottomTop->setText("Bottom/Middle/Top");
     }
+
+    // Use BG Material flag. The bgMaterial render path is triple-layer only, so hide
+    // the toggle when triple layer metatiles aren't in use.
+    ui->frame_BgMaterial->setVisible(projectConfig.tripleLayerMetatilesEnabled);
 
     // Raw attributes value
     ui->spinBox_RawAttributesValue->setMaximum(Metatile::getMaxAttributesMask());
@@ -312,6 +317,7 @@ void TilesetEditor::rebuildMetatilePropertiesFrame() {
     addWidgetToMetatileProperties(ui->frame_MetatileBehavior,   &row, 2);
     addWidgetToMetatileProperties(ui->frame_EncounterType,      &row, 2);
     addWidgetToMetatileProperties(ui->frame_TerrainType,        &row, 2);
+    addWidgetToMetatileProperties(ui->frame_BgMaterial,         &row, 2);
     addWidgetToMetatileProperties(ui->frame_RawAttributesValue, &row, 2);
     addWidgetToMetatileProperties(ui->frame_MetatileLabel,      &row, 2);
 }
@@ -816,6 +822,8 @@ void TilesetEditor::refreshMetatileAttributes() {
     ui->comboBox_EncounterType->setHexItem(this->metatile->encounterType());
     ui->comboBox_TerrainType->setHexItem(this->metatile->terrainType());
     ui->comboBox_LayerType->setHexItem(this->metatile->layerType());
+    const QSignalBlocker b_BgMaterial(ui->checkBox_BgMaterial);
+    ui->checkBox_BgMaterial->setChecked(this->metatile->usesBgMaterial());
     ui->spinBox_RawAttributesValue->setValue(this->metatile->getAttributes());
 
     this->metatileSelector->drawSelectedMetatile();
@@ -836,6 +844,19 @@ void TilesetEditor::commitTerrainType() {
 void TilesetEditor::commitLayerType() {
     commitAttributeFromComboBox(Metatile::Attr::LayerType, ui->comboBox_LayerType);
     this->metatileSelector->drawSelectedMetatile(); // Changing the layer type can affect how fully transparent metatiles appear
+}
+
+void TilesetEditor::commitBgMaterial(bool on) {
+    if (!this->metatile) return;
+    uint32_t newValue = on ? 1 : 0;
+    if (newValue != this->metatile->getAttribute(Metatile::Attr::BgMaterial)) {
+        Metatile *prevMetatile = new Metatile(*this->metatile);
+        this->metatile->setAttribute(Metatile::Attr::BgMaterial, newValue);
+        this->commitMetatileChange(prevMetatile);
+
+        const QSignalBlocker b_RawAttributesValue(ui->spinBox_RawAttributesValue);
+        ui->spinBox_RawAttributesValue->setValue(this->metatile->getAttributes());
+    }
 }
 
 bool TilesetEditor::save() {

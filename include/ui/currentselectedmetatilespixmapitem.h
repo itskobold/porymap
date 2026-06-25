@@ -19,6 +19,6 @@ public:
     void setLayout(Layout *layout) { this->layout = layout; }
 };
 
-QPixmap drawMetatileSelection(MetatileSelection selection, Layout *layout);
+QPixmap drawMetatileSelection(MetatileSelection selection, Layout *layout, int selectedBgMaterial = -1);
 
 #endif // CURRENTSELECTEDMETATILESPIXMAPITEM_H

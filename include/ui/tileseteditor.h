@@ -153,6 +153,7 @@ private:
     void commitEncounterType();
     void commitTerrainType();
     void commitLayerType();
+    void commitBgMaterial(bool on);
     void commit(MetatileHistoryItem *item);
     void updateEditHistoryActions();
     void setRawAttributesVisible(bool visible);

@@ -12,7 +12,10 @@ QByteArray Blockdata::serialize() const {
 
 QByteArray Blockdata::serializeAttributes() const {
     QByteArray data;
-    for (const auto &block : *this)
-        data.append(static_cast<char>(block.attributesValue()));
+    for (const auto &block : *this) {
+        uint16_t attr = block.attributesValue();
+        data.append(static_cast<char>(attr & 0xff));
+        data.append(static_cast<char>((attr >> 8) & 0xff));
+    }
     return data;
 }

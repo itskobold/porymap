@@ -285,7 +285,9 @@ private slots:
     void on_actionOpen_Log_File_triggered();
     void on_actionOpen_Config_Folder_triggered();
     void on_horizontalSlider_MetatileZoom_valueChanged(int value);
-    void on_horizontalSlider_CollisionZoom_valueChanged(int value);
+    void on_checkBox_PaintCollision_toggled(bool on);
+    void on_checkBox_PaintCliffCollision_toggled(bool on);
+    void on_checkBox_PaintBgMaterialOnly_toggled(bool on);
     void on_pushButton_NewWildMonGroup_clicked();
     void on_pushButton_DeleteWildMonGroup_clicked();
     void on_pushButton_SummaryChart_clicked();

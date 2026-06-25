@@ -116,11 +116,13 @@ public:
     void setY(int newY) { this->y = newY; }
     void setZ(int newZ) { this->elevation = newZ; }
     void setElevation(int newElevation) { this->elevation = newElevation; }
+    void setAnyElevation(bool newAnyElevation) { this->anyElevation = newAnyElevation; }
 
     int getX() const { return this->x; }
     int getY() const { return this->y; }
     int getZ() const { return this->elevation; }
     int getElevation() const { return this->elevation; }
+    bool getAnyElevation() const { return this->anyElevation; }
 
     int getPixelX() const;
     int getPixelY() const;
@@ -179,6 +181,9 @@ protected:
     int x = 0;
     int y = 0;
     int elevation = 0;
+    // "any elevation" flag: event interacts with the player regardless of elevation.
+    // Maps to bit 7 of the event's elevation byte in the engine (EVENT_ELEVATION_ANY).
+    bool anyElevation = false;
 
     bool usesDefaultPixmap = true;
 

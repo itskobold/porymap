@@ -17,7 +17,7 @@ int MetatileSelector::numPrimaryMetatilesRounded() const {
 
 void MetatileSelector::updateBasePixmap() {
     if (this->m_section == DisplaySection::All || !this->layout) {
-        this->basePixmap = QPixmap::fromImage(getMetatileSheetImage(this->layout, this->numMetatilesWide));
+        this->basePixmap = QPixmap::fromImage(getMetatileSheetImage(this->layout, this->numMetatilesWide, false, this->m_selectedBgMaterial));
         return;
     }
 
@@ -37,7 +37,15 @@ void MetatileSelector::updateBasePixmap() {
     this->basePixmap = QPixmap::fromImage(getMetatileSheetImage(
         primary, secondaryForDraw, start, end, this->numMetatilesWide,
         this->layout->metatileLayerOrder(), this->layout->metatileLayerOpacity(),
-        Metatile::pixelSize(), false));
+        Metatile::pixelSize(), false, this->m_selectedBgMaterial));
+}
+
+void MetatileSelector::setSelectedBgMaterial(int value) {
+    if (value == this->m_selectedBgMaterial)
+        return;
+    this->m_selectedBgMaterial = value;
+    updateBasePixmap();
+    draw();
 }
 
 void MetatileSelector::setDisplaySection(DisplaySection section, Tileset *secondaryOverride, int locationIndex) {
@@ -90,9 +98,10 @@ bool MetatileSelector::select(uint16_t metatileId) {
     return true;
 }
 
-void MetatileSelector::selectFromMap(uint16_t metatileId, uint16_t collision, uint16_t elevation, int location) {
-    QPair<uint16_t, uint16_t> movePermissions(collision, elevation);
-    this->setExternalSelection(1, 1, {metatileId}, {movePermissions}, {location});
+void MetatileSelector::selectFromMap(const Block &block) {
+    CollisionSelectionItem item{true, block.collision(), block.elevation(),
+                                block.cliffCollision(), block.biome(), block.bgMaterial()};
+    this->setExternalSelection(1, 1, {block.metatileId()}, {item}, {block.location()});
 }
 
 void MetatileSelector::setLayout(Layout *layout) {
@@ -110,7 +119,7 @@ void MetatileSelector::refresh() {
     setLayout(this->layout);
 }
 
-void MetatileSelector::setExternalSelection(int width, int height, const QList<uint16_t> &metatiles, const QList<QPair<uint16_t, uint16_t>> &collisions, const QList<int> &locations) {
+void MetatileSelector::setExternalSelection(int width, int height, const QList<uint16_t> &metatiles, const QList<CollisionSelectionItem> &collisions, const QList<int> &locations) {
     this->prefabSelection = false;
     this->externalSelection = true;
     this->externalSelectionWidth = width;
@@ -123,10 +132,10 @@ void MetatileSelector::setExternalSelection(int width, int height, const QList<u
     this->selection.dimensions = QSize(width, height);
     for (int i = 0; i < qMin(metatiles.length(), collisions.length()); i++) {
         uint16_t metatileId = metatiles.at(i);
-        uint16_t collision = collisions.at(i).first;
-        uint16_t elevation = collisions.at(i).second;
+        CollisionSelectionItem item = collisions.at(i);
+        item.enabled = true;
         int location = locations.value(i, -1);
-        this->selection.collisionItems.append(CollisionSelectionItem{true, collision, elevation});
+        this->selection.collisionItems.append(item);
         this->externalSelectedMetatiles.append(metatileId);
         this->externalSelectedLocations.append(location);
         if (!this->layout->metatileIsValid(metatileId))

@@ -89,6 +89,7 @@ SOURCES += src/core/advancemapparser.cpp \
     src/ui/collisionpixmapitem.cpp \
     src/ui/locationpixmapitem.cpp \
     src/ui/biomepixmapitem.cpp \
+    src/ui/bgmaterialselector.cpp \
     src/ui/connectionpixmapitem.cpp \
     src/ui/currentselectedmetatilespixmapitem.cpp \
     src/ui/gridsettings.cpp \
@@ -208,6 +209,7 @@ HEADERS  += include/core/advancemapparser.h \
     include/ui/collisionpixmapitem.h \
     include/ui/locationpixmapitem.h \
     include/ui/biomepixmapitem.h \
+    include/ui/bgmaterialselector.h \
     include/ui/connectionpixmapitem.h \
     include/ui/currentselectedmetatilespixmapitem.h \
     include/ui/gridsettings.h \

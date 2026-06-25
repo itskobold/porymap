@@ -6,8 +6,35 @@
 #include <QPainter>
 #include <QFont>
 
+static QImage getElevationMetatileImage(int value);
+
+// On-map graphic for a collision tile: a solid box (colour given) with the elevation
+// level number centred in white.
+static QImage getCollisionTileImage(int level, const QColor &color) {
+    const int w = Metatile::pixelWidth();
+    const int h = Metatile::pixelHeight();
+    QImage image(w, h, QImage::Format_ARGB32);
+    image.fill(color);
+
+    QPainter painter(&image);
+    QFont font = painter.font();
+    font.setPixelSize(h / 2);
+    font.setBold(true);
+    painter.setFont(font);
+    painter.setPen(Qt::white);
+    painter.drawText(QRect(0, 0, w, h), Qt::AlignCenter, QString::number(level));
+    painter.end();
+    return image;
+}
+
 QImage getCollisionMetatileImage(Block block) {
-    return getCollisionMetatileImage(block.elevation());
+    // Impassable tiles are drawn as red boxes; cliff-collision-only tiles as orange boxes;
+    // passable tiles show their elevation level. The main collision bit takes precedence.
+    if (block.collision())
+        return getCollisionTileImage(block.elevation(), QColor(208, 32, 32));
+    if (block.cliffCollision())
+        return getCollisionTileImage(block.elevation(), QColor(232, 128, 16));
+    return getElevationMetatileImage(block.elevation());
 }
 
 // Builds the on-map graphic for an ordinary elevation level: the elevation tile image
@@ -54,14 +81,8 @@ static QImage getElevationMetatileImage(int value) {
     return image;
 }
 
-// The single per-tile attribute value selects how the tile is drawn on the Collision tab:
-// the special values (0-3) use the icons from the collision sheet, while ordinary
-// elevation levels (4+) are drawn as coloured, numbered tiles.
+// Draw an elevation value as a coloured, numbered tile (no collision information).
 QImage getCollisionMetatileImage(int value) {
-    if (value < Elevation::NumSpecial) {
-        const QImage * image = Editor::collisionIcons.value(value);
-        return image ? *image : QImage();
-    }
     return getElevationMetatileImage(value);
 }
 
@@ -117,14 +138,16 @@ QImage getMetatileImage(
         const Tileset *secondaryTileset,
         const QList<int> &layerOrder,
         const QList<float> &layerOpacity,
-        bool useTruePalettes)
+        bool useTruePalettes,
+        const Metatile *bgMaterialMetatile)
 {
     return getMetatileImage(Tileset::getMetatile(metatileId, primaryTileset, secondaryTileset),
                             primaryTileset,
                             secondaryTileset,
                             layerOrder,
                             layerOpacity,
-                            useTruePalettes);
+                            useTruePalettes,
+                            bgMaterialMetatile);
 }
 
 // The color to use when we want to show some portion of the image request was invalid.
@@ -139,7 +162,8 @@ QImage getMetatileImage(
         const Tileset *secondaryTileset,
         const QList<int> &layerOrder,
         const QList<float> &layerOpacity,
-        bool useTruePalettes)
+        bool useTruePalettes,
+        const Metatile *bgMaterialMetatile)
 {
     QImage metatileImage(Metatile::pixelSize(), QImage::Format_RGBA8888);
     if (!metatile) {
@@ -159,14 +183,22 @@ QImage getMetatileImage(
     QPainter painter(&metatileImage);
 
     uint32_t layerType = metatile->layerType();
-    for (const auto &layer : layerOrder)
-    for (int y = 0; y < Metatile::tileHeight(); y++)
-    for (int x = 0; x < Metatile::tileWidth(); x++) {
+    for (const auto &layer : layerOrder) {
+        // bgMaterial (triple-layer only): replace this metatile's bottom layer (0) with the
+        // material metatile's bottom layer; keep this metatile's middle (1) and top (2).
+        // Mirrors the game's DrawMetatile bgMaterial path.
+        const Metatile *layerMetatile = metatile;
+        int sourceLayer = layer;
+        if (bgMaterialMetatile && projectConfig.tripleLayerMetatilesEnabled && layer == 0) {
+            layerMetatile = bgMaterialMetatile;
+        }
+        for (int y = 0; y < Metatile::tileHeight(); y++)
+        for (int x = 0; x < Metatile::tileWidth(); x++) {
         // Get the tile to render next
         Tile tile;
         int tileOffset = (y * Metatile::tileWidth()) + x;
         if (projectConfig.tripleLayerMetatilesEnabled) {
-            tile = metatile->tiles.value(tileOffset + (layer * Metatile::tilesPerLayer()));
+            tile = layerMetatile->tiles.value(tileOffset + (sourceLayer * Metatile::tilesPerLayer()));
         } else {
             // "Vanilla" metatiles only have 8 tiles, but render 12.
             // The remaining 4 tiles are rendered using user-specified tiles depending on layer type.
@@ -215,6 +247,7 @@ QImage getMetatileImage(
 
         tile.flip(&tileImage);
         painter.drawImage(x * Tile::pixelWidth(), y * Tile::pixelHeight(), tileImage);
+        }
     }
     painter.end();
 
@@ -269,7 +302,8 @@ QImage getMetatileSheetImage(const Tileset *primaryTileset,
                              const QList<int> &layerOrder,
                              const QList<float> &layerOpacity,
                              const QSize &metatileSize,
-                             bool useTruePalettes)
+                             bool useTruePalettes,
+                             int selectedBgMaterial)
 {
     if (metatileIdEnd < metatileIdStart || numMetatilesWide <= 0)
         return QImage();
@@ -282,10 +316,17 @@ QImage getMetatileSheetImage(const Tileset *primaryTileset,
     QImage image(numMetatilesWide * metatileSize.width(), numMetatilesTall * metatileSize.height(), QImage::Format_RGBA8888);
     image.fill(getInvalidImageColor());
 
+    // Metatiles flagged "use bg material" preview with the selected material's metatile.
+    // selectedBgMaterial < 0 means no material context (e.g. prefab/border previews).
+    const Metatile *materialMetatile = (selectedBgMaterial >= 0)
+            ? Tileset::getMetatile(selectedBgMaterial, primaryTileset, secondaryTileset) : nullptr;
+
     QPainter painter(&image);
     for (int i = 0; i < numMetatilesToDraw; i++) {
         uint16_t metatileId = i + metatileIdStart;
-        QImage metatileImage = getMetatileImage(metatileId, primaryTileset, secondaryTileset, layerOrder, layerOpacity, useTruePalettes)
+        const Metatile *metatile = Tileset::getMetatile(metatileId, primaryTileset, secondaryTileset);
+        const Metatile *bgMaterial = (materialMetatile && metatile && metatile->usesBgMaterial()) ? materialMetatile : nullptr;
+        QImage metatileImage = getMetatileImage(metatile, primaryTileset, secondaryTileset, layerOrder, layerOpacity, useTruePalettes, bgMaterial)
                                                 .scaled(metatileSize);
 
         int x = (i % numMetatilesWide) * metatileSize.width();
@@ -305,7 +346,8 @@ QImage getMetatileSheetImage(const Tileset *primaryTileset,
                              const QList<int> &layerOrder,
                              const QList<float> &layerOpacity,
                              const QSize &metatileSize,
-                             bool useTruePalettes)
+                             bool useTruePalettes,
+                             int selectedBgMaterial)
 {
     auto createSheetImage = [=](uint16_t start, const Tileset *tileset) {
         uint16_t end = start;
@@ -322,7 +364,8 @@ QImage getMetatileSheetImage(const Tileset *primaryTileset,
                                      layerOrder,
                                      layerOpacity,
                                      metatileSize,
-                                     useTruePalettes);
+                                     useTruePalettes,
+                                     selectedBgMaterial);
     };
 
     QImage primaryImage = createSheetImage(0, primaryTileset);
@@ -339,7 +382,7 @@ QImage getMetatileSheetImage(const Tileset *primaryTileset,
     return image;
 }
 
-QImage getMetatileSheetImage(const Layout *layout, int numMetatilesWide, bool useTruePalettes) {
+QImage getMetatileSheetImage(const Layout *layout, int numMetatilesWide, bool useTruePalettes, int selectedBgMaterial) {
     if (!layout)
         return QImage();
     return getMetatileSheetImage(layout->tileset_primary,
@@ -348,5 +391,6 @@ QImage getMetatileSheetImage(const Layout *layout, int numMetatilesWide, bool us
                                  layout->metatileLayerOrder(),
                                  layout->metatileLayerOpacity(),
                                  Metatile::pixelSize(),
-                                 useTruePalettes);
+                                 useTruePalettes,
+                                 selectedBgMaterial);
 }

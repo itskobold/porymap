@@ -28,6 +28,8 @@ void BorderMetatilesPixmapItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
             if (item.metatileId >= Project::getNumMetatilesPrimary())
                 continue;
             layout->setBorderMetatileId(pos.x() + i, pos.y() + j, item.metatileId, true);
+            // Stamp the selected bgMaterial onto painted border tiles, like map painting does.
+            layout->setBorderBgMaterial(pos.x() + i, pos.y() + j, this->metatileSelector->selectedBgMaterial());
         }
     }
 
@@ -48,7 +50,13 @@ void BorderMetatilesPixmapItem::draw() {
 
     for (int i = 0; i < width; i++) {
         for (int j = 0; j < height; j++) {
-            QImage metatile_image = getMetatileImage(layout->getBorderMetatileId(i, j), layout);
+            uint16_t metatileId = layout->getBorderMetatileId(i, j);
+            // Border tiles flagged "use bg material" preview with their bgMaterial.
+            const Metatile *tileMetatile = Tileset::getMetatile(metatileId, layout->tileset_primary, layout->tileset_secondary);
+            const Metatile *materialMetatile = (tileMetatile && tileMetatile->usesBgMaterial())
+                    ? Tileset::getMetatile(layout->getBorderBgMaterial(i, j), layout->tileset_primary, layout->tileset_secondary) : nullptr;
+            QImage metatile_image = getMetatileImage(metatileId, layout->tileset_primary, layout->tileset_secondary,
+                                                     layout->metatileLayerOrder(), layout->metatileLayerOpacity(), false, materialMetatile);
             int x = i * Metatile::pixelWidth();
             int y = j * Metatile::pixelHeight();
             painter.drawImage(x, y, metatile_image);
