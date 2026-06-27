@@ -1609,15 +1609,15 @@ void Project::readTilesetPaths(Tileset* tileset) {
             tileset->metatiles_path = rootDir + metatiles_values.value(0).section('"', 1, 1);
         if (!metatile_attrs_values.isEmpty())
             tileset->metatile_attrs_path = rootDir + metatile_attrs_values.value(0).section('"', 1, 1);
-        for (const auto &value : palettes_values)
-            tileset->palettePaths.append(this->fixPalettePath(rootDir + value.section('"', 1, 1)));
+        if (!palettes_values.isEmpty())
+            tileset->palettePath = this->fixPalettePath(rootDir + palettes_values.value(0).section('"', 1, 1));
     } else {
         // Read C tileset data files
         const QString graphicsFile = projectConfig.getFilePath(ProjectFilePath::tilesets_graphics);
         const QString metatilesFile = projectConfig.getFilePath(ProjectFilePath::tilesets_metatiles);
         
         const QString tilesImagePath = parser.readCIncbin(graphicsFile, tileset->tiles_label);
-        const QStringList palettePaths = parser.readCIncbinArray(graphicsFile, tileset->palettes_label);
+        const QString palettePath = parser.readCIncbin(graphicsFile, tileset->palettes_label);
         auto metatileIncbins = parser.readCIncbinMulti(metatilesFile);
         const QString metatilesPath = metatileIncbins.value(tileset->metatiles_label);
         const QString metatileAttrsPath = metatileIncbins.value(tileset->metatile_attrs_label);
@@ -1628,8 +1628,8 @@ void Project::readTilesetPaths(Tileset* tileset) {
             tileset->metatiles_path = rootDir + metatilesPath;
         if (!metatileAttrsPath.isEmpty())
             tileset->metatile_attrs_path = rootDir + metatileAttrsPath;
-        for (const auto &path : palettePaths)
-            tileset->palettePaths.append(this->fixPalettePath(rootDir + path));
+        if (!palettePath.isEmpty())
+            tileset->palettePath = this->fixPalettePath(rootDir + palettePath);
     }
 
     // Try to set default paths, if any weren't found by reading the files above
@@ -1642,12 +1642,8 @@ void Project::readTilesetPaths(Tileset* tileset) {
         tileset->metatile_attrs_path = defaultPath + "/metatile_attributes.bin";
     // Compositing data lives alongside the attributes; derive its path from that directory.
     tileset->metatile_compositing_path = tileset->metatile_attrs_path.left(tileset->metatile_attrs_path.lastIndexOf('/') + 1) + "metatile_compositing.bin";
-    if (tileset->palettePaths.isEmpty()) {
-        QString palettes_dir_path = defaultPath + "/palettes/";
-        for (int i = 0; i < Tileset::maxPalettes(); i++) {
-            tileset->palettePaths.append(palettes_dir_path + QString("%1").arg(i, 2, 10, QLatin1Char('0')) + ".pal");
-        }
-    }
+    if (tileset->palettePath.isEmpty())
+        tileset->palettePath = defaultPath + "/palette.pal";
 }
 
 Tileset *Project::createNewTileset(QString name, bool secondary, bool checkerboardFill) {
@@ -1661,11 +1657,10 @@ Tileset *Project::createNewTileset(QString name, bool secondary, bool checkerboa
     tileset->name = name;
     tileset->is_secondary = secondary;
 
-    // Create tileset directories
+    // Create tileset directory
     const QString fullDirectoryPath = QString("%1/%2").arg(this->root).arg(tileset->getExpectedDir());
-    const QString palettesPath = fullDirectoryPath + "/palettes";
-    for (const auto& dir : {fullDirectoryPath, palettesPath}) {
-        QString error = Util::mkpath(dir);
+    {
+        QString error = Util::mkpath(fullDirectoryPath);
         if (!error.isEmpty()) {
             logError(QString("Failed to create tileset '%1': %2.").arg(tileset->name).arg(error));
             delete tileset;
@@ -1674,6 +1669,7 @@ Tileset *Project::createNewTileset(QString name, bool secondary, bool checkerboa
     }
 
     tileset->tilesImagePath = fullDirectoryPath + "/tiles.png";
+    tileset->palettePath = fullDirectoryPath + "/palette.pal";
     tileset->metatiles_path = fullDirectoryPath + "/metatiles.bin";
     tileset->metatile_attrs_path = fullDirectoryPath + "/metatile_attributes.bin";
     tileset->metatile_compositing_path = fullDirectoryPath + "/metatile_compositing.bin";
@@ -1703,18 +1699,21 @@ Tileset *Project::createNewTileset(QString name, bool secondary, bool checkerboa
         tileset->addMetatile(metatile);
     }
 
-    // Create default palettes
+    // Create default palettes. All 16 banks are kept in memory; only this tileset's banks
+    // (numPalettes, starting at its offset) get written to palette.pal on save.
     for(int i = 0; i < Tileset::maxPalettes(); ++i) {
         QList<QRgb> currentPal;
-        for(int i = 0; i < Tileset::numColorsPerPalette();++i) {
+        for(int j = 0; j < Tileset::numColorsPerPalette(); ++j) {
             currentPal.append(qRgb(0,0,0));
         }
         tileset->palettes.append(currentPal);
         tileset->palettePreviews.append(currentPal);
-        tileset->palettePaths.append(QString("%1/%2.pal").arg(palettesPath).arg(i, 2, 10, QLatin1Char('0')));
     }
-    tileset->palettes[0][1] = qRgb(255,0,255);
-    tileset->palettePreviews[0][1] = qRgb(255,0,255);
+    tileset->numPalettes = secondary ? (Project::getNumPalettesTotal() - Project::getNumPalettesPrimary())
+                                     : Project::getNumPalettesPrimary();
+    int firstBank = secondary ? Project::getNumPalettesPrimary() : 0;
+    tileset->palettes[firstBank][1] = qRgb(255,0,255);
+    tileset->palettePreviews[firstBank][1] = qRgb(255,0,255);
 
     // Update tileset label arrays
     QStringList *labelList = tileset->is_secondary ? &this->secondaryTilesetLabels : &this->primaryTilesetLabels;

@@ -32,7 +32,10 @@ public:
     QString metatile_compositing_label;
     QString metatile_compositing_path;
     QString tilesImagePath;
-    QStringList palettePaths;
+    // Tileset palettes live in a single multi-bank palette.pal (96 colours primary,
+    // 112 secondary, 16 per bank). numPalettes is the bank count loaded from that file.
+    QString palettePath;
+    int numPalettes = 0;
 
     QHash<int, QString> metatileLabels;
     QList<QList<QRgb>> palettes;
@@ -112,6 +115,9 @@ public:
     static constexpr int numColorsPerPalette() { return 16; }
 
 private:
+    // First palette bank index belonging to this tileset (0 for primary, NUM_PALS_PRIMARY for secondary).
+    int paletteOffset() const;
+
     QList<Metatile*> m_metatiles;
 
     QList<QImage> m_tiles;

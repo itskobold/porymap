@@ -23,7 +23,8 @@ Tileset::Tileset(const Tileset &other)
       metatile_compositing_label(other.metatile_compositing_label),
       metatile_compositing_path(other.metatile_compositing_path),
       tilesImagePath(other.tilesImagePath),
-      palettePaths(other.palettePaths),
+      palettePath(other.palettePath),
+      numPalettes(other.numPalettes),
       metatileLabels(other.metatileLabels),
       palettes(other.palettes),
       palettePreviews(other.palettePreviews),
@@ -52,7 +53,8 @@ Tileset &Tileset::operator=(const Tileset &other) {
     metatile_compositing_path = other.metatile_compositing_path;
     tilesImagePath = other.tilesImagePath;
     m_tilesImage = other.m_tilesImage.copy();
-    palettePaths = other.palettePaths;
+    palettePath = other.palettePath;
+    numPalettes = other.numPalettes;
     metatileLabels = other.metatileLabels;
     palettes = other.palettes;
     palettePreviews = other.palettePreviews;
@@ -360,27 +362,24 @@ bool Tileset::appendToGraphics(const QString &filepath, const QString &friendlyN
     }
 
     const QString tilesetDir = this->getExpectedDir();
-    const QString tilesPath = QString("%1/tiles%2").arg(tilesetDir).arg(projectConfig.getIdentifier(ProjectIdentifier::tiles_output_extension));
-    const QString palettesPath = tilesetDir + "/palettes/";
-    const QString palettesExt = projectConfig.getIdentifier(ProjectIdentifier::pals_output_extension);
+    // Single 8bpp tiles.png + single multi-bank palette.pal. tiles.png stores absolute palette
+    // indices; "-palette_mod 16" reduces them to per-bank relative indices at build time.
+    const QString tilesPath = tilesetDir + "/tiles.png";
+    const QString palettePath = tilesetDir + "/palette.pal";
 
     QString dataString = "\n";
     if (usingAsm) {
         // Append to asm file
         dataString.append("\t.align 2\n");
         dataString.append(QString("gTilesetPalettes_%1::\n").arg(friendlyName));
-        for (int i = 0; i < Project::getNumPalettesTotal(); i++)
-            dataString.append(QString("\t.incbin \"%1%2%3\"\n").arg(palettesPath).arg(i, 2, 10, QLatin1Char('0')).arg(palettesExt));
+        dataString.append(QString("\t.incbin \"%1\"\n").arg(palettePath));
         dataString.append("\n\t.align 2\n");
         dataString.append(QString("gTilesetTiles_%1::\n").arg(friendlyName));
-        dataString.append(QString("\t.incbin \"%1\"\n").arg(tilesPath));
+        dataString.append(QString("\t.incbin \"%1.8bpp\"\n").arg(tilesPath));
     } else {
         // Append to C file
-        dataString.append(QString("const u16 gTilesetPalettes_%1[][%2] =\n{\n").arg(friendlyName).arg(Tileset::numColorsPerPalette()));
-        for (int i = 0; i < Project::getNumPalettesTotal(); i++)
-            dataString.append(QString("    INCBIN_U16(\"%1%2%3\"),\n").arg(palettesPath).arg(i, 2, 10, QLatin1Char('0')).arg(palettesExt));
-        dataString.append("};\n");
-        dataString.append(QString("\nconst u32 gTilesetTiles_%1[] = INCBIN_U32(\"%2\");\n").arg(friendlyName, tilesPath));
+        dataString.append(QString("const u16 gTilesetPalettes_%1[] = INCGFX_U16(\"%2\", \".gbapal\");\n").arg(friendlyName, palettePath));
+        dataString.append(QString("const u32 gTilesetTiles_%1[] = INCGFX_U32(\"%2\", \".8bpp\", \"-palette_mod 16\");\n").arg(friendlyName, tilesPath));
     }
     file.write(dataString.toUtf8());
     file.flush();
@@ -615,8 +614,13 @@ bool Tileset::loadTilesImage(QImage *importedImage) {
         image = *importedImage;
         imported = true;
     } else if (QFile::exists(this->tilesImagePath)) {
-        // No image provided, load from file path.
-        image = QImage(this->tilesImagePath).convertToFormat(QImage::Format_Indexed8, Qt::ThresholdDither);
+        // No image provided, load from file path. tiles.png is an 8bpp (256-colour) indexed image
+        // storing absolute palette indices; keep its indices intact rather than requantizing. The
+        // colorCount > numColorsPerPalette() branch below reduces them to per-bank relative indices,
+        // mirroring the game's "-palette_mod 16".
+        image = QImage(this->tilesImagePath);
+        if (image.format() != QImage::Format_Indexed8)
+            image = image.convertToFormat(QImage::Format_Indexed8, Qt::ThresholdDither);
     }
 
     if (image.isNull()) {
@@ -690,41 +694,73 @@ bool Tileset::saveTilesImage() {
     return true;
 }
 
+// First palette bank index belonging to this tileset. Primary banks occupy 0..NUM_PALS_PRIMARY-1,
+// secondary banks NUM_PALS_PRIMARY..NUM_PALS_TOTAL-1, matching the in-game palette layout.
+int Tileset::paletteOffset() const {
+    return this->is_secondary ? Project::getNumPalettesPrimary() : 0;
+}
+
+// Palettes are stored as one multi-bank JASC palette.pal (16 colours per bank). We keep the
+// editor's per-bank model: the 16 absolute banks 0-15 are kept, and this tileset's banks are
+// loaded into the range starting at paletteOffset(). Banks belonging to the paired tileset stay
+// as dummy colours here (they're supplied by that tileset).
 bool Tileset::loadPalettes() {
     this->palettes.clear();
     this->palettePreviews.clear();
 
-    for (int i = 0; i < Project::getNumPalettesTotal(); i++) {
+    // Start every bank as dummy greyscale.
+    for (int i = 0; i < Tileset::maxPalettes(); i++) {
         QList<QRgb> palette;
-        QString path = this->palettePaths.value(i);
-        if (!path.isEmpty()) {
-            bool error = false;
-            palette = PaletteUtil::parse(path, &error);
-            if (error) palette.clear();
-        }
-        if (palette.isEmpty()) {
-            // Either the palette failed to load, or no palette exists.
-            // We expect tilesets to have a certain number of palettes,
-            // so fill this palette with dummy colors.
-            for (int j = 0; j < Tileset::numColorsPerPalette(); j++) {
-                int colorComponent = j * (256 / Tileset::numColorsPerPalette());
-                palette.append(qRgb(colorComponent, colorComponent, colorComponent));
-            }
+        for (int j = 0; j < Tileset::numColorsPerPalette(); j++) {
+            int colorComponent = j * (256 / Tileset::numColorsPerPalette());
+            palette.append(qRgb(colorComponent, colorComponent, colorComponent));
         }
         this->palettes.append(palette);
-        this->palettePreviews.append(palette);
     }
+
+    this->numPalettes = 0;
+    if (!this->palettePath.isEmpty()) {
+        bool error = false;
+        QList<QRgb> colors = PaletteUtil::parse(this->palettePath, &error);
+        if (error) colors.clear();
+
+        const int offset = paletteOffset();
+        const int colorsPerPalette = Tileset::numColorsPerPalette();
+        int numBanks = colors.length() / colorsPerPalette;
+        for (int b = 0; b < numBanks; b++) {
+            int bank = offset + b;
+            if (bank >= Tileset::maxPalettes())
+                break;
+            QList<QRgb> palette;
+            for (int j = 0; j < colorsPerPalette; j++)
+                palette.append(colors.at(b * colorsPerPalette + j));
+            this->palettes[bank] = palette;
+        }
+        this->numPalettes = numBanks;
+    }
+
+    this->palettePreviews = this->palettes;
     return true;
 }
 
 bool Tileset::savePalettes() {
-    bool success = true;
-    int numPalettes = qMin(this->palettePaths.length(), this->palettes.length());
-    for (int i = 0; i < numPalettes; i++) {
-        if (!PaletteUtil::writeJASC(this->palettePaths.at(i), this->palettes.at(i).toVector(), 0, Tileset::numColorsPerPalette()))
-            success = false;
+    const int offset = paletteOffset();
+    int count = this->numPalettes;
+    if (count <= 0) {
+        // Never loaded a count (e.g. brand new tileset); fall back to the standard bank count.
+        count = this->is_secondary ? (Project::getNumPalettesTotal() - Project::getNumPalettesPrimary())
+                                   : Project::getNumPalettesPrimary();
     }
-    return success;
+
+    QVector<QRgb> combined;
+    for (int b = 0; b < count; b++) {
+        const QList<QRgb> &palette = this->palettes.value(offset + b);
+        for (int j = 0; j < Tileset::numColorsPerPalette(); j++)
+            combined.append(palette.value(j, qRgb(0, 0, 0)));
+    }
+    if (combined.isEmpty())
+        return true;
+    return PaletteUtil::writeJASC(this->palettePath, combined, 0, combined.size());
 }
 
 bool Tileset::load() {
