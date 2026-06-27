@@ -29,6 +29,8 @@ public:
     QString metatiles_path;
     QString metatile_attrs_label;
     QString metatile_attrs_path;
+    QString metatile_compositing_label;
+    QString metatile_compositing_path;
     QString tilesImagePath;
     QStringList palettePaths;
 
@@ -62,11 +64,13 @@ public:
     bool load();
     bool loadMetatiles();
     bool loadMetatileAttributes();
+    bool loadMetatileCompositing();
     bool loadTilesImage(QImage *importedImage = nullptr);
     bool loadPalettes();
 
     bool save();
     bool saveMetatileAttributes();
+    bool saveMetatileCompositing();
     bool saveMetatiles();
     bool saveTilesImage();
     bool savePalettes();

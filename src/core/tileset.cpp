@@ -20,6 +20,8 @@ Tileset::Tileset(const Tileset &other)
       metatiles_path(other.metatiles_path),
       metatile_attrs_label(other.metatile_attrs_label),
       metatile_attrs_path(other.metatile_attrs_path),
+      metatile_compositing_label(other.metatile_compositing_label),
+      metatile_compositing_path(other.metatile_compositing_path),
       tilesImagePath(other.tilesImagePath),
       palettePaths(other.palettePaths),
       metatileLabels(other.metatileLabels),
@@ -46,6 +48,8 @@ Tileset &Tileset::operator=(const Tileset &other) {
     metatiles_path = other.metatiles_path;
     metatile_attrs_label = other.metatile_attrs_label;
     metatile_attrs_path = other.metatile_attrs_path;
+    metatile_compositing_label = other.metatile_compositing_label;
+    metatile_compositing_path = other.metatile_compositing_path;
     tilesImagePath = other.tilesImagePath;
     m_tilesImage = other.m_tilesImage.copy();
     palettePaths = other.palettePaths;
@@ -338,6 +342,7 @@ bool Tileset::appendToHeaders(const QString &filepath, const QString &friendlyNa
         dataString.append(QString("    .palettes = gTilesetPalettes_%1,\n").arg(friendlyName));
         dataString.append(QString("    .metatiles = gMetatiles_%1,\n").arg(friendlyName));
         dataString.append(QString("    .metatileAttributes = gMetatileAttributes_%1,\n").arg(friendlyName));
+        dataString.append(QString("    .metatileCompositing = gMetatileCompositing_%1,\n").arg(friendlyName));
         if (projectConfig.tilesetsHaveCallback) dataString.append("    .callback = NULL,\n");
         dataString.append("};\n");
     }
@@ -393,6 +398,7 @@ bool Tileset::appendToMetatiles(const QString &filepath, const QString &friendly
     const QString tilesetDir = this->getExpectedDir();
     const QString metatilesPath = tilesetDir + "/metatiles.bin";
     const QString metatileAttrsPath = tilesetDir + "/metatile_attributes.bin";
+    const QString metatileCompositingPath = tilesetDir + "/metatile_compositing.bin";
 
     QString dataString = "\n";
     if (usingAsm) {
@@ -403,11 +409,15 @@ bool Tileset::appendToMetatiles(const QString &filepath, const QString &friendly
         dataString.append(QString("\n\t.align 1\n"));
         dataString.append(QString("gMetatileAttributes_%1::\n").arg(friendlyName));
         dataString.append(QString("\t.incbin \"%1\"\n").arg(metatileAttrsPath));
+        dataString.append(QString("\n\t.align 1\n"));
+        dataString.append(QString("gMetatileCompositing_%1::\n").arg(friendlyName));
+        dataString.append(QString("\t.incbin \"%1\"\n").arg(metatileCompositingPath));
     } else {
         // Append to C file
         dataString.append(QString("const u16 gMetatiles_%1[] = INCBIN_U16(\"%2\");\n").arg(friendlyName, metatilesPath));
         QString numBits = QString::number(projectConfig.metatileAttributesSize * 8);
         dataString.append(QString("const u%1 gMetatileAttributes_%2[] = INCBIN_U%1(\"%3\");\n").arg(numBits, friendlyName, metatileAttrsPath));
+        dataString.append(QString("const u8 gMetatileCompositing_%1[] = INCBIN_U8(\"%2\");\n").arg(friendlyName, metatileCompositingPath));
     }
     file.write(dataString.toUtf8());
     file.flush();
@@ -555,6 +565,49 @@ bool Tileset::saveMetatileAttributes() {
     return true;
 }
 
+// Per-metatile fg/bg compositing flags, one u8 each, stored parallel to the metatiles/attributes.
+bool Tileset::loadMetatileCompositing() {
+    QFile file(this->metatile_compositing_path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        // Compositing data is optional; absent file just means every metatile defaults to 0.
+        return true;
+    }
+
+    QByteArray data = file.readAll();
+    int numMetatiles = m_metatiles.length();
+    int numEntries = data.length();
+    if (numEntries > numMetatiles) {
+        logWarn(QString("%1 metatile compositing count %2 exceeds metatile count of %3. Additional entries will be ignored.")
+                            .arg(this->name)
+                            .arg(numEntries)
+                            .arg(numMetatiles));
+        numEntries = numMetatiles;
+    } else if (numEntries < numMetatiles) {
+        logWarn(QString("%1 metatile compositing count %2 is fewer than the metatile count of %3. Missing entries will default to 0.")
+                            .arg(this->name)
+                            .arg(numEntries)
+                            .arg(numMetatiles));
+    }
+
+    for (int i = 0; i < numEntries; i++)
+        m_metatiles.at(i)->setCompositing(static_cast<unsigned char>(data.at(i)));
+    return true;
+}
+
+bool Tileset::saveMetatileCompositing() {
+    QFile file(this->metatile_compositing_path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        logError(QString("Could not open '%1' for writing: %2").arg(this->metatile_compositing_path).arg(file.errorString()));
+        return false;
+    }
+
+    QByteArray data;
+    for (const auto &metatile : m_metatiles)
+        data.append(static_cast<char>(metatile->compositing()));
+    file.write(data);
+    return true;
+}
+
 bool Tileset::loadTilesImage(QImage *importedImage) {
     QImage image;
     bool imported = false;
@@ -680,6 +733,7 @@ bool Tileset::load() {
     if (!loadTilesImage()) success = false;
     if (!loadMetatiles()) success = false;
     if (!loadMetatileAttributes()) success = false;
+    if (!loadMetatileCompositing()) success = false;
     return success;
 }
 
@@ -690,6 +744,7 @@ bool Tileset::save() {
     if (!saveTilesImage()) success = false;
     if (!saveMetatiles()) success = false;
     if (!saveMetatileAttributes()) success = false;
+    if (!saveMetatileCompositing()) success = false;
     return success;
 }
 

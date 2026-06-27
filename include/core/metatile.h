@@ -36,6 +36,15 @@ public:
         Unused, // Preserve bits not used by the other attributes
     };
 
+    // Per-metatile fg/bg compositing flags. Stored separately from the attributes, in a parallel
+    // metatile_compositing.bin (one u8 per metatile). Each cliff state gets one bit per layer:
+    // a set bit composites that layer into the foreground plane, a clear bit into the background.
+    // Mirrors METATILE_COMPOSITE_* in pokeemerald.
+    enum CompositeState { CompositeFront, CompositeBehind };
+    static constexpr int kCompositeFrontShift = 0;
+    static constexpr int kCompositeBehindShift = 3;
+    static constexpr int kCompositeLayerCount = 3;
+
 public:
     QList<Tile> tiles;
 
@@ -57,6 +66,11 @@ public:
     void setLayerType(int value)     { this->setAttribute(Attr::LayerType, static_cast<uint32_t>(value)); }
     void setUsesBgMaterial(bool on)  { this->setAttribute(Attr::BgMaterial, on ? 1 : 0); }
 
+    uint8_t compositing() const { return this->m_compositing; }
+    void setCompositing(uint8_t value) { this->m_compositing = value; }
+    bool compositeForeground(CompositeState state, int layer) const;
+    void setCompositeForeground(CompositeState state, int layer, bool on);
+
     static int getIndexInTileset(int);
     static QPoint coordFromPixmapCoord(const QPointF &pixelCoord);
     static uint32_t getDefaultAttributesMask(BaseGameVersion version, Metatile::Attr attr);
@@ -75,7 +89,8 @@ public:
     static constexpr QSize pixelSize() { return QSize(pixelWidth(), pixelHeight()); }
 
     inline bool operator==(const Metatile &other) {
-        return this->tiles == other.tiles && this->attributes == other.attributes;
+        return this->tiles == other.tiles && this->attributes == other.attributes
+            && this->m_compositing == other.m_compositing;
     }
 
     inline bool operator!=(const Metatile &other) {
@@ -84,6 +99,9 @@ public:
 
 private:
     QMap<Metatile::Attr, uint32_t> attributes;
+    uint8_t m_compositing = 0;
+
+    static int compositeBit(CompositeState state, int layer);
 };
 
 #endif // METATILE_H

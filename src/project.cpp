@@ -1640,6 +1640,8 @@ void Project::readTilesetPaths(Tileset* tileset) {
         tileset->metatiles_path = defaultPath + "/metatiles.bin";
     if (tileset->metatile_attrs_path.isEmpty())
         tileset->metatile_attrs_path = defaultPath + "/metatile_attributes.bin";
+    // Compositing data lives alongside the attributes; derive its path from that directory.
+    tileset->metatile_compositing_path = tileset->metatile_attrs_path.left(tileset->metatile_attrs_path.lastIndexOf('/') + 1) + "metatile_compositing.bin";
     if (tileset->palettePaths.isEmpty()) {
         QString palettes_dir_path = defaultPath + "/palettes/";
         for (int i = 0; i < Tileset::maxPalettes(); i++) {
@@ -1674,6 +1676,7 @@ Tileset *Project::createNewTileset(QString name, bool secondary, bool checkerboa
     tileset->tilesImagePath = fullDirectoryPath + "/tiles.png";
     tileset->metatiles_path = fullDirectoryPath + "/metatiles.bin";
     tileset->metatile_attrs_path = fullDirectoryPath + "/metatile_attributes.bin";
+    tileset->metatile_compositing_path = fullDirectoryPath + "/metatile_compositing.bin";
 
     // Set default tiles image
     QImage tilesImage(":/images/blank_tileset.png");

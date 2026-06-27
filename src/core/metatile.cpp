@@ -93,6 +93,24 @@ void Metatile::setAttribute(Metatile::Attr attr, uint32_t value) {
     this->attributes.insert(attr, packer.clamp(value));
 }
 
+int Metatile::compositeBit(CompositeState state, int layer) {
+    int shift = (state == CompositeBehind) ? kCompositeBehindShift : kCompositeFrontShift;
+    return shift + layer;
+}
+
+// Whether the given layer (0=bottom, 1=middle, 2=top) composites into the foreground for this state.
+bool Metatile::compositeForeground(CompositeState state, int layer) const {
+    return (this->m_compositing >> compositeBit(state, layer)) & 1;
+}
+
+void Metatile::setCompositeForeground(CompositeState state, int layer, bool on) {
+    uint8_t bit = 1 << compositeBit(state, layer);
+    if (on)
+        this->m_compositing |= bit;
+    else
+        this->m_compositing &= static_cast<uint8_t>(~bit);
+}
+
 int Metatile::getDefaultAttributesSize(BaseGameVersion version) {
     return (version == BaseGameVersion::pokefirered) ? 4 : 2;
 }

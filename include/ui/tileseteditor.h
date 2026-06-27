@@ -154,6 +154,7 @@ private:
     void commitTerrainType();
     void commitLayerType();
     void commitBgMaterial(bool on);
+    void commitCompositing(Metatile::CompositeState state, int layer, bool on);
     void commit(MetatileHistoryItem *item);
     void updateEditHistoryActions();
     void setRawAttributesVisible(bool visible);

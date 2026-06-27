@@ -165,6 +165,13 @@ void TilesetEditor::initAttributesUi() {
     connect(ui->comboBox_LayerType,         &NoScrollComboBox::editingFinished, this, &TilesetEditor::commitLayerType);
     connect(ui->checkBox_BgMaterial,        &QCheckBox::toggled, this, &TilesetEditor::commitBgMaterial);
 
+    connect(ui->checkBox_CompositeFrontBottom,  &QCheckBox::toggled, this, [this](bool on){ commitCompositing(Metatile::CompositeFront, 0, on); });
+    connect(ui->checkBox_CompositeFrontMiddle,  &QCheckBox::toggled, this, [this](bool on){ commitCompositing(Metatile::CompositeFront, 1, on); });
+    connect(ui->checkBox_CompositeFrontTop,     &QCheckBox::toggled, this, [this](bool on){ commitCompositing(Metatile::CompositeFront, 2, on); });
+    connect(ui->checkBox_CompositeBehindBottom, &QCheckBox::toggled, this, [this](bool on){ commitCompositing(Metatile::CompositeBehind, 0, on); });
+    connect(ui->checkBox_CompositeBehindMiddle, &QCheckBox::toggled, this, [this](bool on){ commitCompositing(Metatile::CompositeBehind, 1, on); });
+    connect(ui->checkBox_CompositeBehindTop,    &QCheckBox::toggled, this, [this](bool on){ commitCompositing(Metatile::CompositeBehind, 2, on); });
+
     // Behavior
     if (projectConfig.metatileBehaviorMask) {
         for (auto i = project->metatileBehaviorMapInverse.constBegin(); i != project->metatileBehaviorMapInverse.constEnd(); i++) {
@@ -217,6 +224,9 @@ void TilesetEditor::initAttributesUi() {
     // Use BG Material flag. The bgMaterial render path is triple-layer only, so hide
     // the toggle when triple layer metatiles aren't in use.
     ui->frame_BgMaterial->setVisible(projectConfig.tripleLayerMetatilesEnabled);
+
+    // Cliff layer compositing flags. Like bgMaterial, these are a triple-layer render feature.
+    ui->frame_Compositing->setVisible(projectConfig.tripleLayerMetatilesEnabled);
 
     // Raw attributes value
     ui->spinBox_RawAttributesValue->setMaximum(Metatile::getMaxAttributesMask());
@@ -318,6 +328,7 @@ void TilesetEditor::rebuildMetatilePropertiesFrame() {
     addWidgetToMetatileProperties(ui->frame_EncounterType,      &row, 2);
     addWidgetToMetatileProperties(ui->frame_TerrainType,        &row, 2);
     addWidgetToMetatileProperties(ui->frame_BgMaterial,         &row, 2);
+    addWidgetToMetatileProperties(ui->frame_Compositing,        &row, 2);
     addWidgetToMetatileProperties(ui->frame_RawAttributesValue, &row, 2);
     addWidgetToMetatileProperties(ui->frame_MetatileLabel,      &row, 2);
 }
@@ -824,6 +835,19 @@ void TilesetEditor::refreshMetatileAttributes() {
     ui->comboBox_LayerType->setHexItem(this->metatile->layerType());
     const QSignalBlocker b_BgMaterial(ui->checkBox_BgMaterial);
     ui->checkBox_BgMaterial->setChecked(this->metatile->usesBgMaterial());
+
+    QCheckBox *compositeBoxes[2][3] = {
+        { ui->checkBox_CompositeFrontBottom,  ui->checkBox_CompositeFrontMiddle,  ui->checkBox_CompositeFrontTop },
+        { ui->checkBox_CompositeBehindBottom, ui->checkBox_CompositeBehindMiddle, ui->checkBox_CompositeBehindTop },
+    };
+    for (int state = 0; state < 2; state++) {
+        for (int layer = 0; layer < Metatile::kCompositeLayerCount; layer++) {
+            const QSignalBlocker b(compositeBoxes[state][layer]);
+            compositeBoxes[state][layer]->setChecked(
+                this->metatile->compositeForeground(static_cast<Metatile::CompositeState>(state), layer));
+        }
+    }
+
     ui->spinBox_RawAttributesValue->setValue(this->metatile->getAttributes());
 
     this->metatileSelector->drawSelectedMetatile();
@@ -857,6 +881,15 @@ void TilesetEditor::commitBgMaterial(bool on) {
         const QSignalBlocker b_RawAttributesValue(ui->spinBox_RawAttributesValue);
         ui->spinBox_RawAttributesValue->setValue(this->metatile->getAttributes());
     }
+}
+
+void TilesetEditor::commitCompositing(Metatile::CompositeState state, int layer, bool on) {
+    if (!this->metatile) return;
+    if (on == this->metatile->compositeForeground(state, layer)) return;
+
+    Metatile *prevMetatile = new Metatile(*this->metatile);
+    this->metatile->setCompositeForeground(state, layer, on);
+    this->commitMetatileChange(prevMetatile);
 }
 
 bool TilesetEditor::save() {
